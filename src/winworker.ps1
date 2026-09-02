@@ -7,6 +7,8 @@ $ErrorActionPreference = 'SilentlyContinue'
 
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]
+$null = [Windows.Storage.Streams.IRandomAccessStreamWithContentType, Windows.Storage.Streams, ContentType = WindowsRuntime]
+$asStreamForRead = ([System.IO.WindowsRuntimeStreamExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsStreamForRead' -and $_.GetParameters().Count -eq 1 })[0]
 $asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' })[0]
 function Await($op, $type) {
   $m = $asTaskGeneric.MakeGenericMethod($type)
@@ -20,15 +22,36 @@ function Get-Manager {
   return $script:mgr
 }
 
+$lastTrack = ''
+function Get-Thumb($p) {
+  # capa do álbum (IRandomAccessStreamReference) → base64; só é chamada quando a faixa muda
+  try {
+    if (-not $p.Thumbnail) { return $null }
+    $ras = Await ($p.Thumbnail.OpenReadAsync()) ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
+    if (-not $ras) { return $null }
+    # o objeto vem como __ComObject: chama AsStreamForRead(IInputStream) por reflexão
+    $stream = $asStreamForRead.Invoke($null, [object[]]@($ras))
+    $ms = New-Object System.IO.MemoryStream; $stream.CopyTo($ms)
+    $bytes = $ms.ToArray(); $stream.Dispose(); $ms.Dispose()
+    if ($bytes.Length -lt 100 -or $bytes.Length -gt 900000) { return $null }
+    $ct = 'image/jpeg'; if ($bytes[0] -eq 137 -and $bytes[1] -eq 80) { $ct = 'image/png' } elseif ($bytes[0] -eq 71 -and $bytes[1] -eq 73) { $ct = 'image/gif' } elseif ($bytes[0] -eq 82 -and $bytes[1] -eq 73) { $ct = 'image/webp' }
+    return "data:$ct;base64," + [Convert]::ToBase64String($bytes)
+  } catch { return $null }
+}
 function Get-Media {
   $m = Get-Manager; if (-not $m) { return $null }
   $s = $m.GetCurrentSession(); if (-not $s) { return $null }
   try {
     $p = Await ($s.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])
     $pb = $s.GetPlaybackInfo(); $tl = $s.GetTimelineProperties()
-    return @{ app = $s.SourceAppUserModelId; title = $p.Title; artist = $p.Artist; album = $p.AlbumTitle;
-              status = [string]$pb.PlaybackStatus; position = [int]$tl.Position.TotalSeconds; duration = [int]$tl.EndTime.TotalSeconds;
-              canNext = $pb.Controls.IsNextEnabled; canPrev = $pb.Controls.IsPreviousEnabled }
+    $key = "$($p.Title)|$($p.Artist)|$($p.AlbumTitle)"
+    $thumb = $null
+    if ($key -ne $script:lastTrack) { $script:lastTrack = $key; $thumb = Get-Thumb $p; if (-not $thumb) { $thumb = '' } }
+    $o = @{ app = $s.SourceAppUserModelId; title = $p.Title; artist = $p.Artist; album = $p.AlbumTitle;
+            status = [string]$pb.PlaybackStatus; position = [int]$tl.Position.TotalSeconds; duration = [int]$tl.EndTime.TotalSeconds;
+            canNext = $pb.Controls.IsNextEnabled; canPrev = $pb.Controls.IsPreviousEnabled }
+    if ($thumb -ne $null) { $o.thumb = $thumb }
+    return $o
   } catch { return $null }
 }
 

@@ -14,11 +14,11 @@
   #pill { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: var(--bg); color: var(--fg);
     border-radius: 0 0 18px 18px; box-shadow: 0 8px 30px rgba(0,0,0,.55), inset 0 -1px 0 rgba(255,255,255,.06);
     width: 240px; height: 30px; overflow: hidden; transition: width .25s cubic-bezier(.2,.8,.2,1), height .25s cubic-bezier(.2,.8,.2,1), border-radius .25s; }
-  body.open #pill { width: 740px; height: 440px; border-radius: 0 0 26px 26px; }
+  body.open #pill { border-radius: 0 0 28px 28px; }
   body.alert #pill { box-shadow: 0 0 0 2px var(--warn), 0 8px 30px rgba(0,0,0,.55); }
 
   /* estado fechado */
-  #mini { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 14px; padding: 0 14px; font-size: 11.5px; white-space: nowrap; transition: opacity .15s; }
+  #mini { position: absolute; inset: 0; height: 30px; display: flex; align-items: center; justify-content: center; gap: 14px; padding: 0 14px; font-size: 11.5px; white-space: nowrap; transition: opacity .15s; }
   body.open #mini { opacity: 0; pointer-events: none; }
   #mini .seg { display: flex; align-items: center; gap: 6px; color: #d8d8dd; }
   #mini .seg svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; }
@@ -31,7 +31,7 @@
   #mini .dot.playing { animation: pulse 1.2s ease-in-out infinite; } @keyframes pulse { 50% { opacity: .35; } }
 
   /* estado aberto */
-  #panel { position: absolute; inset: 0; display: flex; flex-direction: column; opacity: 0; transition: opacity .2s .05s; }
+  #panel { position: absolute; left: 0; top: 0; width: 100%; display: flex; flex-direction: column; opacity: 0; transition: opacity .2s .05s; }
   body.open #panel { opacity: 1; }
   #tabs { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 10px 12px 6px; }
   .tab { width: 38px; height: 32px; border-radius: 10px; display: grid; place-items: center; cursor: pointer; color: var(--muted); position: relative; }
@@ -39,7 +39,7 @@
   .tab:hover { background: var(--bg2); color: var(--fg); } .tab.on { background: var(--bg3); color: var(--fg); }
   .tab .cnt { position: absolute; top: 2px; right: 3px; min-width: 14px; height: 14px; border-radius: 7px; background: var(--warn); color: #1a1200; font-size: 9.5px; font-weight: 700; display: grid; place-items: center; padding: 0 3px; }
   #tabs .sp { flex: 1; } #tabs .clock { font-size: 12px; color: var(--muted); padding: 0 8px; font-variant-numeric: tabular-nums; }
-  #view { flex: 1; overflow: auto; padding: 6px 18px 16px; scrollbar-width: thin; }
+  #view { flex: 1; overflow: auto; padding: 6px 18px 16px; scrollbar-width: thin; max-height: 560px; }
   h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 8px 0 8px; }
   .card { background: var(--bg2); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
   .row { display: flex; align-items: center; gap: 10px; }
@@ -59,8 +59,10 @@
   .app .pin { position: absolute; top: 3px; left: 7px; color: var(--muted); font-size: 12px; display: none; } .app:hover .pin { display: block; } .app.pinned .pin { display: block; color: var(--warn); }
   .app.add { border-style: dashed; color: var(--muted); justify-content: center; }
   /* música */
-  .music { display: grid; grid-template-columns: 96px 1fr; gap: 16px; align-items: center; }
-  .art { width: 96px; height: 96px; border-radius: 18px; background: linear-gradient(135deg, #2a1e4d, #0f2a3d); display: grid; place-items: center; color: var(--acc); }
+  .music { display: grid; grid-template-columns: 104px 1fr; gap: 16px; align-items: center; }
+  .art { width: 104px; height: 104px; border-radius: 20px; background: linear-gradient(135deg, #2a1e4d, #0f2a3d); display: grid; place-items: center; color: var(--acc); overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+  .art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #mini .cover { width: 18px; height: 18px; border-radius: 5px; object-fit: cover; }
   .art svg { width: 40px; height: 40px; fill: currentColor; }
   .art.playing { animation: glow 3s ease-in-out infinite; } @keyframes glow { 50% { box-shadow: 0 0 28px rgba(167,139,250,.35); } }
   .title { font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .artist { color: #c9c9cf; font-size: 13px; margin-top: 2px; }
@@ -71,6 +73,14 @@
   .nlist { overflow: auto; display: flex; flex-direction: column; gap: 4px; }
   .nitem { padding: 8px 10px; border-radius: 10px; cursor: pointer; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .nitem:hover { background: var(--bg2); } .nitem.on { background: var(--bg3); }
   .notes textarea { width: 100%; height: 100%; resize: none; line-height: 1.5; font-size: 13px; }
+  .npane { display: flex; flex-direction: column; gap: 6px; min-height: 0; } .npane textarea { flex: 1; height: auto; }
+  .ck { display: flex; flex-direction: column; gap: 4px; overflow: auto; flex: 1; }
+  .ci { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 9px; background: var(--bg2); }
+  .ci input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--ok); flex: 0 0 16px; }
+  .ci input[type=text] { flex: 1; background: transparent; border: 0; padding: 2px 0; }
+  .ci.done input[type=text] { text-decoration: line-through; color: var(--muted); }
+  .ci .x { color: var(--muted); cursor: pointer; padding: 0 4px; } .ci .x:hover { color: var(--bad); }
+  .seg { display: inline-flex; background: var(--bg2); border-radius: 9px; padding: 2px; } .seg button { padding: 4px 10px; font-size: 11px; background: transparent; } .seg button.on { background: var(--bg3); }
   /* canvas */
   .cv { position: relative; height: 340px; border-radius: 14px; overflow: hidden; background: radial-gradient(rgba(255,255,255,.08) 1px, transparent 1px) 0 0 / 20px 20px, rgba(0,0,0,.35); border: 1px solid var(--line); cursor: grab; }
   .cv.tool-text, .cv.tool-arrow { cursor: crosshair; }
@@ -141,7 +151,7 @@ function renderMini() {
   const box = $('#mini'); const sh = (settings.notch && settings.notch.show) || {};
   let h = '';
   const m = sys && sys.media;
-  if (sh.music !== false && m) h += `<div class="seg"><span class="dot ${m.playing ? 'playing' : ''}" style="background:${m.playing ? 'var(--ok)' : 'var(--muted)'}"></span><div class="track ${(m.title + m.artist).length > 24 ? 'scroll' : ''}"><span>${esc(m.title)}${m.artist ? ' — ' + esc(m.artist) : ''}</span></div></div>`;
+  if (sh.music !== false && m) h += `<div class="seg">${m.art ? `<img class="cover" src="${m.art}">` : ''}<span class="dot ${m.playing ? 'playing' : ''}" style="background:${m.playing ? 'var(--ok)' : 'var(--muted)'}"></span><div class="track ${(m.title + m.artist).length > 24 ? 'scroll' : ''}"><span>${esc(m.title)}${m.artist ? ' — ' + esc(m.artist) : ''}</span></div></div>`;
   if (sh.system !== false && sys) h += `<div class="seg">${I.cpu}<span style="color:${col(sys.cpu)}">${sys.cpu}%</span><div class="bar"><i style="width:${sys.mem.percent}%;background:${col(sys.mem.percent)}"></i></div></div>`;
   if (sh.calendar !== false && cal && cal.next) { const min = Math.round((cal.next.start - Date.now()) / 60000); h += `<div class="seg">${I.cal}<span>${min < 60 ? min + ' min' : hhmm(cal.next.start)} · ${esc(cal.next.title.slice(0, 18))}</span></div>`; }
   const n = (approvals.pending || []).length + ((approvals.maestri && approvals.maestri.prompts) || []).length;
@@ -170,6 +180,7 @@ function renderView() {
   else if (tab === 'canvas') { v.innerHTML = viewCanvas(); bindCanvas(); }
   else if (tab === 'cal') v.innerHTML = viewCal();
   if (tab === 'music') bindMusic();
+  requestAnimationFrame(fitPill);
 }
 
 // música
@@ -177,7 +188,7 @@ function viewMusic() {
   const m = sys && sys.media;
   if (!m) return `<div class="empty">${I.music}Nada tocando agora.<div class="muted" style="margin-top:4px">Spotify, YouTube, Chrome, VLC… qualquer player que apareça nos controles de mídia do Windows.</div></div>`;
   const pos = mediaPos(m), pct = m.duration ? pos / m.duration * 100 : 0;
-  return `<div class="card music"><div class="art ${m.playing ? 'playing' : ''}">${I.note}</div><div class="grow">
+  return `<div class="card music"><div class="art ${m.playing ? 'playing' : ''}">${m.art ? `<img src="${m.art}">` : I.note}</div><div class="grow">
       <div class="muted">${esc(m.app || '')}${m.album ? ' · ' + esc(m.album) : ''}</div>
       <div class="title" title="${esc(m.title)}">${esc(m.title)}</div><div class="artist">${esc(m.artist)}</div>
       <div class="row" style="margin-top:10px"><span class="time" id="mpos">${fmtT(pos)}</span><div class="bar grow"><i id="mbar" style="width:${pct}%;background:var(--acc)"></i></div><span class="time">${m.duration ? fmtT(m.duration) : '–:––'}</span></div>
@@ -231,17 +242,42 @@ function bindApps() {
 let curNote = null, noteTimer = null;
 function viewNotes() {
   if (!curNote || !docs.notes.find((n) => n.id === curNote)) curNote = docs.notes[0] && docs.notes[0].id;
-  const n = docs.notes.find((x) => x.id === curNote);
-  return `<div class="notes"><div><div class="row" style="margin-bottom:6px"><button id="nAdd" class="grow">+ Nova</button><button id="nDel" title="Apagar">🗑</button></div><div class="nlist">${docs.notes.map((x) => `<div class="nitem ${x.id === curNote ? 'on' : ''}" data-n="${x.id}">${esc(x.title || (x.text || '').split('\n')[0] || 'Sem título')}</div>`).join('')}</div></div>
-    <textarea id="nText" placeholder="Escreva aqui… (a primeira linha vira o título)">${esc(n ? n.text : '')}</textarea></div>`;
+  const n = docs.notes.find((x) => x.id === curNote) || {};
+  const isCk = n.type === 'checklist';
+  const items = n.items || [];
+  const done = items.filter((i) => i.done).length;
+  const icon = (x) => x.type === 'checklist' ? '☑ ' : '';
+  return `<div class="notes"><div><div class="row" style="margin-bottom:6px"><button id="nAdd" class="grow">+ Nota</button><button id="nAddCk" class="grow" title="Nova lista de tarefas">+ Lista</button><button id="nDel" title="Apagar">🗑</button></div><div class="nlist">${docs.notes.map((x) => `<div class="nitem ${x.id === curNote ? 'on' : ''}" data-n="${x.id}">${icon(x)}${esc(x.title || (x.text || '').split('\n')[0] || 'Sem título')}</div>`).join('')}</div></div>
+    <div class="npane">
+      <div class="row"><input id="nTitle" class="grow" placeholder="Título" value="${esc(n.title || '')}"><div class="seg"><button id="segT" class="${isCk ? '' : 'on'}">Texto</button><button id="segC" class="${isCk ? 'on' : ''}">Checklist</button></div></div>
+      ${isCk ? `<div class="muted">${done}/${items.length} concluídas</div><div class="ck" id="ck">${items.map((it, i) => `<div class="ci ${it.done ? 'done' : ''}" data-i="${i}"><input type="checkbox" ${it.done ? 'checked' : ''}><input type="text" value="${esc(it.text)}" placeholder="Tarefa"><span class="x" title="Remover">×</span></div>`).join('')}</div><div class="row"><input id="ckNew" class="grow" placeholder="Nova tarefa… (Enter)"><button id="ckAdd">+</button></div>`
+             : `<textarea id="nText" placeholder="Escreva aqui…">${esc(n.text || '')}</textarea>`}
+    </div></div>`;
 }
 function bindNotes() {
+  const cur = () => docs.notes.find((x) => x.id === curNote);
   document.querySelectorAll('[data-n]').forEach((el) => el.onclick = () => { curNote = el.dataset.n; renderView(); });
-  $('#nAdd').onclick = () => { const id = 'n' + Date.now().toString(36); docs.notes.unshift({ id, title: '', text: '', updatedAt: Date.now() }); curNote = id; saveDocs(); renderView(); api.setFocusable(true); $('#nText').focus(); };
-  $('#nDel').onclick = () => { docs.notes = docs.notes.filter((x) => x.id !== curNote); if (!docs.notes.length) docs.notes.push({ id: 'n' + Date.now().toString(36), title: '', text: '', updatedAt: Date.now() }); curNote = docs.notes[0].id; saveDocs(); renderView(); };
+  const newNote = (type) => { const id = 'n' + Date.now().toString(36); docs.notes.unshift({ id, type, title: '', text: '', items: [], updatedAt: Date.now() }); curNote = id; saveDocs(); renderView(); api.setFocusable(true); setTimeout(() => { const f = $(type === 'checklist' ? '#ckNew' : '#nText'); f && f.focus(); }, 40); };
+  $('#nAdd').onclick = () => newNote('text'); $('#nAddCk').onclick = () => newNote('checklist');
+  $('#nDel').onclick = () => { docs.notes = docs.notes.filter((x) => x.id !== curNote); if (!docs.notes.length) docs.notes.push({ id: 'n' + Date.now().toString(36), type: 'text', title: '', text: '', items: [], updatedAt: Date.now() }); curNote = docs.notes[0].id; saveDocs(); renderView(); };
+  const refreshList = () => { const n = cur(); document.querySelectorAll('[data-n]').forEach((el) => { if (el.dataset.n === curNote) el.textContent = (n.type === 'checklist' ? '☑ ' : '') + (n.title || (n.text || '').split('\n')[0] || 'Sem título'); }); };
+  $('#nTitle').oninput = () => { const n = cur(); n.title = $('#nTitle').value.slice(0, 80); n.updatedAt = Date.now(); clearTimeout(noteTimer); noteTimer = setTimeout(() => { saveDocs(); refreshList(); }, 400); };
+  $('#segT').onclick = () => { const n = cur(); if (n.type === 'checklist') { n.type = 'text'; if (!n.text && (n.items || []).length) n.text = n.items.map((i) => (i.done ? '[x] ' : '[ ] ') + i.text).join('\n'); saveDocs(); renderView(); } };
+  $('#segC').onclick = () => { const n = cur(); if (n.type !== 'checklist') { n.type = 'checklist'; if (!(n.items || []).length && n.text) n.items = n.text.split('\n').filter(Boolean).map((l) => ({ text: l.replace(/^\[( |x)\]\s*/i, ''), done: /^\[x\]/i.test(l) })); n.items = n.items || []; saveDocs(); renderView(); } };
   const ta = $('#nText');
-  ta.onfocus = () => api.setFocusable(true);
-  ta.oninput = () => { const n = docs.notes.find((x) => x.id === curNote); if (!n) return; n.text = ta.value; n.title = ta.value.split('\n')[0].slice(0, 60); n.updatedAt = Date.now(); clearTimeout(noteTimer); noteTimer = setTimeout(() => { saveDocs(); document.querySelectorAll('[data-n]').forEach((el) => { if (el.dataset.n === curNote) el.textContent = n.title || 'Sem título'; }); }, 400); };
+  if (ta) ta.oninput = () => { const n = cur(); if (!n) return; n.text = ta.value; if (!n.title) { /* título automático pela 1ª linha */ } n.updatedAt = Date.now(); clearTimeout(noteTimer); noteTimer = setTimeout(() => { saveDocs(); refreshList(); }, 400); };
+  const ck = $('#ck');
+  if (ck) {
+    const n = cur();
+    const add = () => { const v = $('#ckNew').value.trim(); if (!v) return; n.items.push({ text: v, done: false }); saveDocs(); renderView(); setTimeout(() => { api.setFocusable(true); $('#ckNew').focus(); }, 30); };
+    $('#ckAdd').onclick = add; $('#ckNew').onkeydown = (e) => { if (e.key === 'Enter') add(); };
+    ck.querySelectorAll('.ci').forEach((row) => {
+      const i = Number(row.dataset.i), it = n.items[i];
+      row.querySelector('input[type=checkbox]').onchange = (e) => { it.done = e.target.checked; row.classList.toggle('done', it.done); saveDocs(); const m = document.querySelector('.npane .muted'); if (m) m.textContent = `${n.items.filter((x) => x.done).length}/${n.items.length} concluídas`; };
+      row.querySelector('input[type=text]').oninput = (e) => { it.text = e.target.value; clearTimeout(noteTimer); noteTimer = setTimeout(saveDocs, 400); };
+      row.querySelector('.x').onclick = () => { n.items.splice(i, 1); saveDocs(); renderView(); };
+    });
+  }
 }
 function saveDocs() { api.setDocs({ notes: docs.notes, boards: docs.boards }); }
 
@@ -339,23 +375,33 @@ function viewCal() {
 
 // ---------- abrir/fechar + click-through ----------
 function typing() { const a = document.activeElement; return a && (/(INPUT|TEXTAREA)/.test(a.tagName) || a.isContentEditable); }
+const SIZES = { music: [520, 0], sys: [640, 0], apps: [720, 0], notes: [640, 0], canvas: [760, 0], cal: [620, 0] };
+function fitPill() {
+  if (!document.body.classList.contains('open')) return;
+  const w = (SIZES[tab] || [640])[0];
+  const h = Math.min(540, $('#tabs').offsetHeight + $('#view').scrollHeight + 6);
+  const pill = $('#pill'); pill.style.width = w + 'px'; pill.style.height = h + 'px';
+}
 function setOpen(v) {
   if (!v && (pinned || typing() || drag)) return;
-  if (v && !document.body.classList.contains('open')) { $('#pill').style.width = ''; renderTabs(); renderView(); }
+  if (v && !document.body.classList.contains('open')) { renderTabs(); renderView(); }
   document.body.classList.toggle('open', v);
-  if (!v) { api.setFocusable(false); renderMini(); }
+  if (v) fitPill(); else { $('#pill').style.height = ''; api.setFocusable(false); renderMini(); }
 }
 const root = $('#root');
 root.addEventListener('mousemove', (e) => { const ui = e.target.closest('#pill, #hit'); api.setIgnoreMouse(!ui); if (ui) { clearTimeout(openTimer); setOpen(true); } });
 document.addEventListener('mouseleave', () => { api.setIgnoreMouse(true); openTimer = setTimeout(() => setOpen(false), 350); });
 root.addEventListener('mouseover', (e) => { if (!e.target.closest('#pill, #hit')) openTimer = setTimeout(() => setOpen(false), 350); });
 document.addEventListener('focusout', () => setTimeout(() => { if (!typing()) api.setFocusable(false); }, 50));
+// janela é não-focável por padrão (não rouba foco); ao clicar num campo, torna focável antes de o foco acontecer
+document.addEventListener('mousedown', (e) => { const t = e.target; if (t && (/(INPUT|TEXTAREA)/.test(t.tagName) || t.isContentEditable)) { api.setFocusable(true); setTimeout(() => t.focus(), 30); } }, true);
 
 (async () => {
   settings = await api.getSettings(); tab = (settings.notch && settings.notch.tab) || 'music';
   sys = await api.getSystem(); cal = await api.getCalendar(); docs = await api.getDocs(); approvals = await api.getApprovals(); webapps = await api.listWebApps();
   renderMini();
-  api.onSystem((s) => { sys = s; renderMini(); if (document.body.classList.contains('open') && (tab === 'music' || tab === 'sys')) { if (tab === 'sys' || !document.activeElement || document.activeElement === document.body) renderView(); } });
+  let musicKey = '';
+  api.onSystem((s) => { sys = s; renderMini(); if (!document.body.classList.contains('open')) return; if (tab === 'sys') renderView(); if (tab === 'music') { const m = s.media; const k = m ? `${m.title}|${m.artist}|${m.playing}|${!!m.art}` : ''; if (k !== musicKey) { musicKey = k; renderView(); } } });
   api.onCalendar((c) => { cal = c; renderMini(); if (tab === 'cal' && document.body.classList.contains('open')) renderView(); });
   api.onSettings((s) => { settings = s; renderMini(); });
   api.onApprovals((a) => { approvals = a; renderMini(); });

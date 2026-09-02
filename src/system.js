@@ -80,10 +80,13 @@ class SystemMonitor extends EventEmitter {
     if (j.net) { this.state.net = { down: Number(j.net.down) || 0, up: Number(j.net.up) || 0 }; this._push('down', this.state.net.down); this._push('up', this.state.net.up); }
     if (Array.isArray(j.disks) && j.disks.length) this.state.disks = j.disks.map((d) => ({ name: d.name, total: Number(d.total) || 0, free: Number(d.free) || 0, percent: d.total ? Math.round((1 - d.free / d.total) * 100) : 0 }));
     const m = j.media;
+    if (m && m.thumb !== undefined) this._thumb = { key: `${m.title}|${m.artist}|${m.album}`, data: m.thumb || null };
+    const key = m ? `${m.title}|${m.artist}|${m.album}` : '';
+    const art = this._thumb && this._thumb.key === key ? this._thumb.data : null;
     this.state.media = m && (m.title || m.artist) ? {
       app: appName(m.app, `${m.title} ${m.artist}`), appId: m.app, title: m.title || '', artist: m.artist || '', album: m.album || '',
       status: m.status || 'Unknown', playing: m.status === 'Playing', position: Number(m.position) || 0, duration: Number(m.duration) || 0,
-      canNext: !!m.canNext, canPrev: !!m.canPrev, at: Date.now()
+      canNext: !!m.canNext, canPrev: !!m.canPrev, at: Date.now(), art
     } : null;
     this.emit('stats', this.state);
   }

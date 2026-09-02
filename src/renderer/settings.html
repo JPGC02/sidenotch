@@ -11,17 +11,18 @@
   body { margin: 0; background: transparent; color: var(--fg); font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; font-size: 13px; overflow: hidden; }
   body.solid { background: linear-gradient(160deg, #17171d, #0f0f13); }
   #app { display: grid; grid-template-columns: 208px 1fr; height: 100%; }
-  aside { padding: 44px 12px 12px; display: flex; flex-direction: column; gap: 4px; -webkit-app-region: drag; background: var(--ink); backdrop-filter: blur(30px); }
-  aside .brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 14px; font-weight: 700; font-size: 15px; }
+  aside { padding: 44px 12px 12px; display: flex; flex-direction: column; gap: 4px; background: var(--ink); backdrop-filter: blur(30px); }
+  #dragzone { position: fixed; top: 0; left: 0; right: 140px; height: 36px; -webkit-app-region: drag; }
+  aside .brand { -webkit-app-region: drag; display: flex; align-items: center; gap: 10px; padding: 6px 10px 14px; font-weight: 700; font-size: 15px; }
   aside .brand i { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, var(--acc), var(--acc2)); display: inline-block; }
-  .nav { -webkit-app-region: no-drag; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; color: #d7d7dd; font-weight: 500; }
+  .nav { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; color: #d7d7dd; font-weight: 500; }
   .nav svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; opacity: .9; }
   .nav:hover { background: var(--glass); } .nav.on { background: var(--acc); color: #0b0b10; } .nav.on svg { opacity: 1; }
   aside .foot { margin-top: auto; -webkit-app-region: no-drag; font-size: 11px; color: var(--muted); padding: 8px 10px; }
   main { overflow: auto; padding: 44px 28px 28px; scrollbar-width: thin; }
   h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; letter-spacing: -.3px; } .lead { color: var(--muted); margin: 0 0 18px; }
   .page { display: none; } .page.on { display: block; animation: fade .18s ease; } @keyframes fade { from { opacity: 0; transform: translateY(4px); } }
-  section { background: var(--glass); border: 1px solid var(--line); border-radius: 16px; padding: 4px 16px; margin-bottom: 14px; backdrop-filter: blur(20px); }
+  section { background: var(--glass); border: 1px solid var(--line); border-radius: 20px; padding: 4px 16px; margin-bottom: 14px; backdrop-filter: blur(20px); }
   section h2 { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; margin: 12px 0 2px; }
   .r { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 0; border-top: 1px solid var(--line); }
   section > .r:first-of-type, section h2 + .r { border-top: 0; }
@@ -50,6 +51,7 @@
 </style>
 </head>
 <body>
+<div id="dragzone"></div>
 <div id="app">
   <aside>
     <div class="brand"><i></i>SideNotch</div>
