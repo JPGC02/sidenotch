@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>SideNotch</title>
+<style>
+  :root {
+    --bg: #0b0b0d; --bg2: #151518; --bg3: #1f1f24; --fg: #f3f3f5; --muted: #8a8a93;
+    --ok: #22c55e; --warn: #f59e0b; --bad: #ef4444; --info: #60a5fa; --track: #2a2a30;
+    --bar-w: 64px; --collapsed-w: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  html, body { width: 100%; height: 100%; background: transparent; overflow: hidden;
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif; color: var(--fg); }
+  #root { position: relative; width: 100%; height: 100%; }
+
+  #hit { position: absolute; top: 0; bottom: 0; width: 28px; }
+  body.right #hit { right: 0; } body.left #hit { left: 0; }
+
+  #bar { position: absolute; top: 50%; transform: translateY(-50%);
+    width: var(--collapsed-w); background: var(--bg);
+    border-radius: 18px; overflow: hidden; box-shadow: 0 6px 24px rgba(0,0,0,.45);
+    transition: width .22s cubic-bezier(.2,.8,.2,1), border-radius .22s; }
+  body.right #bar { right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  body.left  #bar { left: 0;  border-top-left-radius: 0;  border-bottom-left-radius: 0; }
+  body.open #bar { width: var(--bar-w); }
+  body.right.open #bar { border-radius: 22px 0 0 22px; }
+  body.left.open  #bar { border-radius: 0 22px 22px 0; }
+  body.dragging #bar { opacity: .85; }
+
+  /* notch fechada: pontinhos / percentual */
+  #compact { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px 0; transition: opacity .15s; }
+  body.open #compact { opacity: 0; pointer-events: none; }
+  #compact .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--track); }
+  #compact .pctv { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 10px; font-weight: 700; letter-spacing: .5px; }
+
+  #list { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0 8px; width: var(--bar-w); opacity: 0; transition: opacity .18s; }
+  body.open #list { opacity: 1; }
+  #grip { width: 28px; height: 14px; border-radius: 7px; cursor: grab; display: grid; place-items: center; color: var(--muted); font-size: 12px; letter-spacing: 2px; line-height: 1; margin-bottom: 2px; }
+  #grip:hover { background: var(--bg2); color: var(--fg); }
+  .item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 6px; border-radius: 12px; cursor: pointer; position: relative; }
+  .item:hover { background: var(--bg2); }
+  .ring { width: 40px; height: 40px; position: relative; }
+  .ring svg { width: 40px; height: 40px; transform: rotate(-90deg); }
+  .ring .track { stroke: var(--track); }
+  .ring .arc { transition: stroke-dashoffset .6s ease, stroke .3s; stroke-linecap: round; }
+  .ring .icon { position: absolute; inset: 0; display: grid; place-items: center; }
+  .ring .icon svg { width: 16px; height: 16px; transform: none; fill: var(--fg); }
+  .pct { font-size: 11.5px; font-weight: 600; letter-spacing: .2px; }
+  .item.err .pct { color: var(--bad); }
+  .item.stale .pct { color: var(--warn); }
+  .item.loading .ring svg { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(270deg); } }
+  .ibtn { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; position: relative; color: var(--fg); }
+  .ibtn:hover { background: var(--bg2); }
+  .ibtn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+  .ibtn .cnt { position: absolute; top: 2px; right: 0; min-width: 14px; height: 14px; border-radius: 7px; background: var(--info); color: #06213f; font-size: 9.5px; font-weight: 700; display: grid; place-items: center; padding: 0 3px; }
+  .ibtn .cnt.wait { background: var(--warn); color: #1a1200; }
+  #dnd.on { color: var(--warn); }
+  #sep { width: 28px; height: 1px; background: var(--track); margin: 4px 0; }
+
+  /* painel lateral (cartões, toasts, sessões, popover) */
+  #panel { position: absolute; top: 50%; transform: translateY(-50%); max-height: 100%; width: 262px; display: none; flex-direction: column; gap: 8px; overflow-y: auto; padding: 2px 0; scrollbar-width: none; }
+  body.right #panel { right: calc(var(--bar-w) + 12px); } body.left #panel { left: calc(var(--bar-w) + 12px); }
+  body.open #panel.has { display: flex; }
+  .card { background: var(--bg); border-radius: 14px; padding: 11px 13px; box-shadow: 0 10px 30px rgba(0,0,0,.5); border-left: 3px solid var(--warn); animation: fade .15s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateX(var(--dx, 6px)); } }
+  body.left .card { --dx: -6px; }
+  .card.done { border-left-color: var(--ok); } .card.waiting { border-left-color: var(--warn); } .card.denied { border-left-color: var(--bad); }
+  .card.limit, .card.alert { border-left-color: var(--info); } .card.error { border-left-color: var(--bad); } .card.update { border-left-color: var(--info); }
+  .card.plain { border-left-color: var(--bg3); }
+  .card .ttl { font-size: 12.5px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .card .ttl .tool { background: var(--bg2); border-radius: 6px; padding: 1px 6px; font-size: 10.5px; color: var(--warn); white-space: nowrap; }
+  .card .ttl .x { color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+  .card .ttl .x:hover { color: var(--fg); }
+  .card .cmd { font-family: Consolas, "Cascadia Mono", monospace; font-size: 11px; background: var(--bg2); border-radius: 8px; padding: 6px 8px; margin: 8px 0 6px; white-space: pre-wrap; word-break: break-all; max-height: 96px; overflow: auto; }
+  .card .txt { font-size: 11.5px; color: #d5d5da; margin-top: 5px; line-height: 1.35; max-height: 70px; overflow: hidden; }
+  .card .meta { font-size: 10.5px; color: var(--muted); display: flex; justify-content: space-between; gap: 6px; margin-top: 4px; }
+  .card .btns { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .card button { flex: 1; border: 0; border-radius: 8px; padding: 7px 0; font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; min-width: 60px; }
+  .card .allow { background: var(--ok); color: #04120a; }
+  .card .always { background: var(--bg2); color: var(--fg); }
+  .card .deny { background: rgba(239,68,68,.15); color: var(--bad); }
+  .card .q { margin: 8px 0; } .card .qt { font-size: 11.5px; margin-bottom: 5px; }
+  .card .opts { display: flex; flex-wrap: wrap; gap: 5px; }
+  .card .opt { flex: 0 0 auto; background: var(--bg2); color: var(--fg); padding: 5px 9px; font-size: 11px; font-weight: 500; min-width: 0; }
+  .card .opt.sel { background: var(--ok); color: #04120a; }
+  .card textarea, .card input[type=text] { width: 100%; margin-top: 6px; background: var(--bg2); color: var(--fg); border: 1px solid var(--track); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 11.5px; resize: none; user-select: text; }
+  .card textarea:focus, .card input:focus { outline: 1px solid var(--info); }
+  .sess-hdr { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--muted); padding: 0 4px; margin-top: 2px; }
+  .sess-hdr .dotc { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* sessões */
+  .srow { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: start; padding: 7px 0; border-top: 1px solid var(--track); }
+  .srow:first-child { border-top: 0; }
+  .srow .dotc { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; }
+  .srow .nm { font-size: 12px; font-weight: 600; }
+  .srow .sub { font-size: 10.5px; color: var(--muted); }
+  .srow .st { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: var(--bg2); }
+  .st.running { color: var(--info); } .st.waiting { color: var(--warn); } .st.idle { color: var(--ok); } .st.error { color: var(--bad); } .st.ended { color: var(--muted); }
+
+  /* popover de uso */
+  #pop h3 { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  #pop h3 svg { width: 16px; height: 16px; fill: var(--fg); }
+  #pop .sub { color: var(--muted); font-size: 10.5px; margin: -6px 0 8px; }
+  .row { margin: 8px 0; }
+  .row .hdr { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+  .row .hdr .reset { color: var(--muted); }
+  .row .track { height: 5px; background: var(--track); border-radius: 4px; overflow: hidden; }
+  .row .fill { height: 100%; border-radius: 4px; }
+  .row .used { font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+  .hint { font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .errmsg { font-size: 12px; color: var(--bad); margin-bottom: 4px; }
+  .foot { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 8px; }
+  .fc { font-size: 11px; margin: 6px 0; padding: 6px 8px; border-radius: 8px; background: var(--bg2); }
+  .fc.bad { color: var(--warn); }
+  .chart { margin-top: 8px; } .chart .lbl { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+  .chart svg { width: 100%; height: 34px; display: block; }
+
+  body.alert #bar { box-shadow: 0 0 0 2px var(--warn), 0 6px 24px rgba(0,0,0,.45); animation: pulse 1.2s ease-in-out infinite; }
+  body.dnd.alert #bar { animation: none; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(245,158,11,.35), 0 6px 24px rgba(0,0,0,.45); } }
+  #badge { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--warn); color: #1a1200; font-size: 11px; font-weight: 700; display: none; place-items: center; z-index: 2; }
+  body.alert:not(.open) #badge { display: grid; }
+</style>
+</head>
+<body class="right">
+<div id="root">
+  <div id="hit"></div>
+  <div id="bar">
+    <div id="badge"></div>
+    <div id="compact"></div>
+    <div id="list"></div>
+  </div>
+  <div id="panel"></div>
+</div>
+
+<script>
+const ICONS = {
+  claude: '<svg viewBox="0 0 24 24"><path d="M12 2l1.6 6.2L19 5.5l-3.7 5.1L21 12l-5.7 1.4 3.7 5.1-5.4-2.7L12 22l-1.6-6.2L5 18.5l3.7-5.1L3 12l5.7-1.4L5 5.5l5.4 2.7z"/></svg>',
+  codex:  '<svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 2.2a6.8 6.8 0 1 1 0 13.6 6.8 6.8 0 0 1 0-13.6zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>',
+  cursor: '<svg viewBox="0 0 24 24"><path d="M12 2l9 5v10l-9 5-9-5V7l9-5zm0 2.3L5.4 8 12 11.7 18.6 8 12 4.3zM5 9.7v6.1l6 3.3v-6.1L5 9.7z"/></svg>',
+  gemini: '<svg viewBox="0 0 24 24"><path d="M12 2c.6 5.4 4.6 9.4 10 10-5.4.6-9.4 4.6-10 10-.6-5.4-4.6-9.4-10-10 5.4-.6 9.4-4.6 10-10z"/></svg>',
+  antigravity: '<svg viewBox="0 0 24 24"><path d="M12 3l8 14H4l8-14zm0 4.5L8 15h8l-4-7.5z"/></svg>',
+  openrouter: '<svg viewBox="0 0 24 24"><path d="M3 7h5l4 5-4 5H3v-2h4l2.4-3L7 9H3V7zm18 0h-5l-4 5 4 5h5v-2h-4l-2.4-3L17 9h4V7z"/></svg>',
+  nvidia: '<svg viewBox="0 0 24 24"><path d="M4 8v8h4v-3.2l6 3.2h6V8h-4v3.2L10 8H4zm2 2h3.5L16 13.8V10h2v4h-3.5L8 10.2V14H6v-4z"/></svg>',
+  opencode: '<svg viewBox="0 0 24 24"><path d="M8 6l-6 6 6 6 1.5-1.5L5 12l4.5-4.5L8 6zm8 0l-1.5 1.5L19 12l-4.5 4.5L16 18l6-6-6-6z"/></svg>'
+};
+const SVG = {
+  gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  sessions: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg>',
+  bell: '<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+  bellOff: '<svg viewBox="0 0 24 24"><path d="M13.7 21a2 2 0 0 1-3.4 0M18.6 13A17 17 0 0 1 18 8a6 6 0 0 0-9.3-5M6.3 6.3A6 6 0 0 0 6 8c0 7-3 9-3 9h14M1 1l22 22"/></svg>'
+};
+const R = 17, C = 2 * Math.PI * R;
+const api = window.sidenotch;
+const $ = (s) => document.querySelector(s);
+let settings = {}, usage = [], approvals = { pending: [], sessions: [], feed: [], maestri: null }, hovered = null, openTimer = null, pinned = false, view = null, barH = 420, toastTimers = {};
+
+const color = (p) => p >= 85 ? 'var(--bad)' : p >= 60 ? 'var(--warn)' : 'var(--ok)';
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const ago = (iso) => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 1 ? 'agora' : m < 60 ? `${m} min` : `${Math.round(m / 60)} h`; };
+function fmtReset(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), ms = d - Date.now();
+  if (ms <= 0) return 'Reinicia em breve';
+  const h = Math.floor(ms / 3.6e6), m = Math.floor((ms % 3.6e6) / 6e4);
+  if (h < 24) return `Reinicia em ${h ? h + 'h ' : ''}${m}m`;
+  return `Reinicia ${d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+const fmtMin = (m) => m == null ? '' : m < 60 ? `${Math.round(m)} min` : `${Math.floor(m / 60)}h ${Math.round(m % 60)}m`;
+
+// ---------- barra ----------
+function renderBar() {
+  const list = $('#list'); list.innerHTML = '';
+  const grip = document.createElement('div'); grip.id = 'grip'; grip.textContent = '⋯'; grip.title = 'Arraste para mover';
+  grip.addEventListener('mousedown', (e) => { e.preventDefault(); document.body.classList.add('dragging'); api.drag('start'); });
+  list.appendChild(grip);
+  for (const u of usage) {
+    const p = u.ok && u.primary ? u.primary.usedPercent : null;
+    const el = document.createElement('div');
+    el.className = 'item' + (u.ok ? '' : ' err') + (u.stale ? ' stale' : '');
+    el.dataset.id = u.id;
+    const label = p == null ? (u.ok ? (u.stats ? u.stats.label : '—') : '!') : Math.round(p) + '%';
+    el.innerHTML = `
+      <div class="ring"><svg viewBox="0 0 40 40">
+          <circle class="track" cx="20" cy="20" r="${R}" fill="none" stroke-width="3"/>
+          <circle class="arc" cx="20" cy="20" r="${R}" fill="none" stroke-width="3" stroke="${p == null ? 'var(--track)' : color(p)}" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - (p == null ? 0 : p / 100))}"/>
+        </svg><div class="icon">${ICONS[u.id] || ''}</div></div>
+      <div class="pct" style="${u.stats ? 'font-size:10px' : ''}">${esc(label)}</div>`;
+    el.addEventListener('mouseenter', () => showPop(u.id, el));
+    el.addEventListener('click', async () => { el.classList.add('loading'); await api.refresh(); });
+    list.appendChild(el);
+  }
+  const sep = document.createElement('div'); sep.id = 'sep'; list.appendChild(sep);
+  const mt = (approvals.maestri && approvals.maestri.terminals) || [];
+  const act = approvals.sessions.filter((s) => s.status !== 'ended').concat(mt.filter((t) => t.isRunning && !t.isUnloaded));
+  const waiting = approvals.sessions.filter((s) => s.status === 'waiting').length + mt.filter((t) => t.needsAttention || t.hasPrompt).length;
+  const sb = btn('sessions', SVG.sessions, 'Sessões do Claude Code', () => toggleView('sessions'));
+  if (act.length) sb.insertAdjacentHTML('beforeend', `<span class="cnt ${waiting ? 'wait' : ''}">${waiting || act.length}</span>`);
+  list.appendChild(sb);
+  const db = btn('dnd', settings.dnd ? SVG.bellOff : SVG.bell, settings.dnd ? 'Não perturbe: ligado' : 'Não perturbe: desligado', () => api.setDnd(!settings.dnd));
+  if (settings.dnd) db.classList.add('on');
+  if (approvals.feed.length) db.insertAdjacentHTML('beforeend', `<span class="cnt">${approvals.feed.length}</span>`);
+  db.addEventListener('mouseenter', () => { if (approvals.feed.length) toggleView('feed', true); });
+  list.appendChild(db);
+  list.appendChild(btn('gear', SVG.gear, 'Configurações', () => api.openSettings()));
+  barH = list.scrollHeight + 32;
+  fitHeight();
+  renderCompact();
+  if (hovered) { const el = list.querySelector(`[data-id="${hovered}"]`); if (el) showPop(hovered, el); }
+}
+function btn(id, svg, title, onClick) { const b = document.createElement('div'); b.className = 'ibtn'; b.id = id; b.innerHTML = svg; b.title = title; b.onclick = onClick; b.addEventListener('mouseenter', () => { if (view === 'pop') setView(null); }); return b; }
+function fitHeight() { api.setBarHeight(Math.max(barH, 640)); }   // altura fixa: a janela é transparente, e redimensionar no hover fazia a barra pular
+
+function renderCompact() {
+  const c = $('#compact'); c.innerHTML = '';
+  const mode = settings.compact || 'dots';
+  const ok = usage.filter((u) => u.ok && u.primary);
+  if (mode === 'off' || !ok.length) { document.documentElement.style.setProperty('--collapsed-w', (settings.collapsedWidth || 6) + 'px'); return; }
+  if (mode === 'dots') {
+    document.documentElement.style.setProperty('--collapsed-w', Math.max(settings.collapsedWidth || 6, 11) + 'px');
+    for (const u of ok) c.insertAdjacentHTML('beforeend', `<div class="dot" style="background:${color(u.primary.usedPercent)}"></div>`);
+  } else {
+    document.documentElement.style.setProperty('--collapsed-w', '18px');
+    const worst = ok.reduce((a, b) => (b.primary.usedPercent > a.primary.usedPercent ? b : a));
+    c.innerHTML = `<div class="pctv" style="color:${color(worst.primary.usedPercent)}">${Math.round(worst.primary.usedPercent)}%</div>`;
+  }
+}
+
+// ---------- painel ----------
+function setView(v) { view = v; renderPanel(); }
+function toggleView(v, force) { setView(force ? v : (view === v ? null : v)); }
+
+function renderPanel() {
+  const panel = $('#panel'); panel.innerHTML = '';
+  const pend = approvals.pending, feed = approvals.feed;
+  // 1) aprovações agrupadas por sessão
+  const groups = new Map();
+  for (const p of pend) { const k = p.sessionId || '?'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); }
+  for (const [sid, items] of groups) {
+    const s = approvals.sessions.find((x) => x.id === sid);
+    if (groups.size > 1 || (s && s.title)) panel.insertAdjacentHTML('beforeend', `<div class="sess-hdr"><span class="dotc" style="background:${s ? s.color : 'var(--muted)'}"></span>${esc((s && (s.title || s.project)) || items[0].project || 'sessão')}${s && s.model ? ' · ' + esc(s.model.replace('claude-', '')) : ''}</div>`);
+    for (const p of items) panel.appendChild(approvalCard(p, s));
+  }
+  // 1b) prompts S/n do Maestri
+  const mp = (approvals.maestri && approvals.maestri.prompts) || [];
+  for (const p of mp) panel.appendChild(maestriPromptCard(p));
+  // 2) notificações
+  if (view === 'feed' || (!view && feed.length)) for (const n of feed.slice(0, view === 'feed' ? 40 : 4)) panel.appendChild(feedCard(n));
+  // 3) sessões
+  if (view === 'sessions') panel.appendChild(sessionsCard());
+  // 4) popover de uso
+  if (view === 'pop' && hovered) panel.appendChild(usageCard(hovered));
+  panel.classList.toggle('has', panel.children.length > 0);
+  const alertN = pend.length + mp.length;
+  document.body.classList.toggle('alert', alertN > 0);
+  $('#badge').textContent = alertN;
+  if (alertN) setOpen(true);
+  fitHeight();
+}
+
+function approvalCard(p, s) {
+  const card = document.createElement('div'); card.className = 'card';
+  const title = p.kind === 'plan' ? 'Aprovar plano?' : p.kind === 'question' ? 'Claude pergunta' : 'Pede permissão';
+  let body = p.kind === 'question'
+    ? (p.questions || []).map((q, qi) => `<div class="q" data-q="${qi}"><div class="qt">${esc(q.question)}</div><div class="opts">${(q.options || []).map((o) => `<button class="opt" data-label="${esc(o.label)}" title="${esc(o.description || '')}">${esc(o.label)}</button>`).join('')}<button class="opt other">Outra…</button></div><input type="text" class="otherTxt" placeholder="Digite sua resposta" hidden></div>`).join('')
+    : `<div class="cmd">${esc(p.summary || '(sem detalhes)')}</div>`;
+  const btns = p.kind === 'plan'
+    ? `<button class="allow">Aprovar</button><button class="always" data-d="allow-auto" title="Aprovar e usar auto mode">+ auto</button><button class="deny">Recusar</button><button class="always reply">Dizer o que mudar</button>`
+    : p.kind === 'question' ? `<button class="deny">Ignorar</button>`
+    : `<button class="allow">Permitir</button>${p.canAlways ? `<button class="always" data-d="always" title="${esc(p.alwaysLabel || '')}">Sempre</button>` : ''}<button class="deny">Negar</button><button class="always reply">Responder</button>`;
+  card.innerHTML = `<div class="ttl"><span>${title}</span><span class="tool">${esc(p.toolName)}</span></div>${body}
+    <div class="meta"><span title="${esc(p.cwd)}">${esc(s ? (s.title || s.project) : p.project)}</span><span class="exp"></span></div>
+    <textarea class="replyTxt" rows="2" placeholder="Mensagem para o Claude (Enter envia)" hidden></textarea>
+    <div class="btns">${btns}</div>`;
+  const exp = card.querySelector('.exp');
+  const tick = () => { exp.textContent = `${Math.max(0, Math.round((new Date(p.expiresAt) - Date.now()) / 1000))}s`; };
+  tick(); const iv = setInterval(tick, 1000);
+  const decide = (d, extra) => { clearInterval(iv); card.style.opacity = .4; api.setFocusable(false); api.decide(p.id, d, extra); };
+  const q = (sel) => card.querySelector(sel);
+  if (q('.allow')) q('.allow').onclick = () => decide('allow');
+  if (q('.deny')) q('.deny').onclick = () => decide('deny', p.kind === 'question' ? { message: 'Usuário não respondeu pela barra.' } : undefined);
+  card.querySelectorAll('.always[data-d]').forEach((b) => b.onclick = () => decide(b.dataset.d));
+  const reply = q('.reply'), ta = q('.replyTxt');
+  if (reply) reply.onclick = () => { ta.hidden = !ta.hidden; if (!ta.hidden) { api.setFocusable(true); setTimeout(() => ta.focus(), 50); } };
+  if (ta) ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (ta.value.trim()) decide('deny', { message: ta.value.trim() }); } });
+  if (p.kind === 'question') {
+    const answers = {};
+    const maybeSend = () => { if (Object.keys(answers).length === p.questions.length && !q('.send')) { const sb = document.createElement('button'); sb.className = 'allow send'; sb.textContent = 'Enviar respostas'; sb.onclick = () => decide('allow', { answers }); q('.btns').prepend(sb); } };
+    card.querySelectorAll('.opt').forEach((b) => b.onclick = () => {
+      const qe = b.closest('.q'), qd = p.questions[Number(qe.dataset.q)], other = qe.querySelector('.otherTxt');
+      if (b.classList.contains('other')) { other.hidden = false; api.setFocusable(true); setTimeout(() => other.focus(), 50); return; }
+      if (qd.multiSelect) { b.classList.toggle('sel'); answers[qd.question] = [...qe.querySelectorAll('.opt.sel')].map((x) => x.dataset.label).join(', '); }
+      else { qe.querySelectorAll('.opt').forEach((x) => x.classList.remove('sel')); b.classList.add('sel'); answers[qd.question] = b.dataset.label; }
+      maybeSend();
+    });
+    card.querySelectorAll('.otherTxt').forEach((inp) => inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && inp.value.trim()) { const qd = p.questions[Number(inp.closest('.q').dataset.q)]; answers[qd.question] = inp.value.trim(); maybeSend(); q('.send') && q('.send').click(); } }));
+  }
+  return card;
+}
+
+function maestriPromptCard(p) {
+  const card = document.createElement('div'); card.className = 'card';
+  card.innerHTML = `<div class="ttl"><span>${esc(p.name)} pede S/n</span><span class="tool">Maestri · ${esc(p.agentType || 'agente')}</span></div>
+    <div class="cmd">${esc(p.prompt || '(prompt pendente)')}</div>
+    <div class="meta"><span>${esc(p.workspace || '')}</span><span></span></div>
+    <div class="btns"><button class="allow">Aprovar</button><button class="deny">Rejeitar</button><button class="always focus">Ir ao terminal</button></div>`;
+  const act = (a) => { card.style.opacity = .4; api.maestriAction(p.terminalId, a); };
+  card.querySelector('.allow').onclick = () => act('approve');
+  card.querySelector('.deny').onclick = () => act('reject');
+  card.querySelector('.focus').onclick = () => api.maestriAction(p.terminalId, 'focus');
+  return card;
+}
+
+function feedCard(n) {
+  const card = document.createElement('div'); card.className = `card ${n.type}`;
+  card.innerHTML = `<div class="ttl"><span>${esc(n.title)}</span><span class="x" title="Dispensar">×</span></div>${n.text ? `<div class="txt">${esc(n.text)}</div>` : ''}<div class="meta"><span>${esc(n.project || '')}</span><span>${ago(n.at)}</span></div>`;
+  card.querySelector('.x').onclick = () => api.dismiss(n.id);
+  if (n.maestriTerminalId) {
+    card.insertAdjacentHTML('beforeend', `<div class="btns"><button class="always mf">Ir ao terminal</button><button class="always ms">Visto</button></div>`);
+    card.querySelector('.mf').onclick = () => api.maestriAction(n.maestriTerminalId, 'focus');
+    card.querySelector('.ms').onclick = () => { api.maestriAction(n.maestriTerminalId, 'seen'); api.dismiss(n.id); };
+  }
+  if (n.type === 'update') { card.querySelector('.txt') && card.querySelector('.txt').insertAdjacentHTML('afterend', `<div class="btns"><button class="allow" id="doUpdate">Instalar e reiniciar</button></div>`); card.querySelector('#doUpdate').onclick = () => api.installUpdate(); }
+  return card;
+}
+
+function sessionsCard() {
+  const card = document.createElement('div'); card.className = 'card plain';
+  const ss = approvals.sessions;
+  const stName = { running: 'trabalhando', waiting: 'esperando você', idle: 'terminou', error: 'erro', ended: 'encerrada' };
+  const m = approvals.maestri;
+  const mt = (m && m.terminals) || [];
+  const mStatus = (t) => t.hasPrompt || t.needsAttention ? 'waiting' : t.isUnloaded ? 'ended' : t.isActive ? 'running' : t.isRunning ? 'idle' : 'ended';
+  const mName = { waiting: 'precisa de você', running: 'trabalhando', idle: 'parado', ended: 'descarregado' };
+  card.innerHTML = `<div class="ttl"><span>Sessões</span><span class="x">×</span></div>` +
+    (ss.length ? `<div class="hint" style="margin-top:4px">Claude Code</div>` + ss.map((s) => `<div class="srow"><span class="dotc" style="background:${s.color}"></span><div><div class="nm">${esc(s.title || s.project || s.id.slice(0, 8))}</div><div class="sub">${[s.model && s.model.replace('claude-', ''), s.mode, ago(s.lastEventAt)].filter(Boolean).join(' · ')}</div>${s.lastMessage ? `<div class="sub" style="margin-top:2px;color:#c9c9cf">${esc(s.lastMessage.slice(0, 90))}</div>` : ''}</div><span class="st ${s.status}">${stName[s.status] || s.status}</span></div>`).join('') : '') +
+    (mt.length ? `<div class="hint" style="margin-top:8px">Maestri${m.name ? ' · ' + esc(m.name) : ''}</div>` + mt.map((t) => `<div class="srow mrow" data-id="${esc(t.id)}"><span class="dotc" style="background:${esc(t.color || '#60a5fa')}"></span><div><div class="nm">${esc(t.name)}</div><div class="sub">${[t.agentType, t.workspace, t.roleName].filter(Boolean).map(esc).join(' · ')}</div>${t.preview.length ? `<div class="sub" style="margin-top:2px;color:#c9c9cf">${esc(t.preview[t.preview.length - 1].slice(0, 90))}</div>` : ''}<div class="btns" style="margin-top:5px"><button class="always mf">Ir</button>${t.needsAttention ? '<button class="always ms">Visto</button>' : ''}<button class="always mp">Enviar…</button></div><textarea class="mtxt" rows="2" placeholder="Prompt para o terminal (Enter envia)" hidden></textarea></div><span class="st ${mStatus(t)}">${mName[mStatus(t)]}</span></div>`).join('') : '') +
+    (!ss.length && !mt.length ? `<div class="hint">Nenhuma sessão vista ainda. Instale os hooks (Claude Code) ou pareie o Maestri nas configurações.</div>` : (m && !m.paired ? `<div class="hint" style="margin-top:8px">Maestri: não pareado — Configurações → Maestri.</div>` : m && !m.connected && m.error ? `<div class="hint" style="margin-top:8px">Maestri: ${esc(m.error)}</div>` : ''));
+  card.querySelector('.x').onclick = () => setView(null);
+  card.querySelectorAll('.mrow').forEach((row) => {
+    const id = row.dataset.id, ta = row.querySelector('.mtxt');
+    row.querySelector('.mf').onclick = () => api.maestriAction(id, 'focus');
+    const ms = row.querySelector('.ms'); if (ms) ms.onclick = () => api.maestriAction(id, 'seen');
+    row.querySelector('.mp').onclick = () => { ta.hidden = !ta.hidden; if (!ta.hidden) { api.setFocusable(true); setTimeout(() => ta.focus(), 50); } };
+    ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (ta.value.trim()) { api.maestriAction(id, 'prompt', ta.value.trim()); ta.value = ''; ta.hidden = true; api.setFocusable(false); } } });
+  });
+  return card;
+}
+
+function usageCard(id) {
+  const u = usage.find((x) => x.id === id); const card = document.createElement('div'); card.className = 'card plain'; card.id = 'pop';
+  if (!u) return card;
+  let html = `<h3>${ICONS[id] || ''}${esc(u.name)}</h3>`;
+  if (u.account || u.plan) html += `<div class="sub">${[u.account, u.plan].filter(Boolean).map(esc).join(' · ')}</div>`;
+  if (u.stale) html += `<div class="errmsg" style="color:var(--warn)">⚠ Desatualizado: ${esc(u.staleReason || '')}</div>`;
+  if (!u.ok) html += `<div class="errmsg">${esc(u.error)}</div>${u.hint ? `<div class="hint">${esc(u.hint)}</div>` : ''}`;
+  else if (u.stats) html += u.stats.lines.map((l) => `<div class="row"><div class="hdr"><span>${esc(l)}</span></div></div>`).join('') + (u.note ? `<div class="hint">${esc(u.note)}</div>` : '') + costChart(u.stats.days);
+  else if (!u.windows.length) html += `<div class="hint">${esc(u.note || 'Nenhuma janela de uso informada.')}</div>`;
+  else {
+    for (const w of u.windows) html += `<div class="row"><div class="hdr"><span>${esc(w.label)}</span><span class="reset">${fmtReset(w.resetsAt)}</span></div><div class="track"><div class="fill" style="width:${w.usedPercent}%;background:${color(w.usedPercent)}"></div></div><div class="used">${Math.round(w.usedPercent)}% usado</div></div>`;
+    if (u.credits != null) html += `<div class="hint">Créditos: ${u.credits}</div>`;
+    const f = u.forecast;
+    if (f && f.rate > 0) html += `<div class="fc ${f.exhaustsBeforeReset ? 'bad' : ''}">${f.exhaustsBeforeReset ? '⚠ ' : ''}No ritmo atual (${f.rate}%/min) a janela ${f.exhaustsBeforeReset ? 'esgota em ' + fmtMin(f.etaMinutes) + ', antes de reiniciar' : 'não esgota antes de reiniciar'}${f.resetMinutes != null ? ' (' + fmtMin(f.resetMinutes) + ')' : ''}.</div>`;
+    else if (f && f.rate === 0) html += `<div class="fc">Sem consumo nos últimos minutos.</div>`;
+    html += usageChart(u.series);
+  }
+  html += `<div class="foot"><span>Atualizado ${new Date(u.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span><span>clique no anel p/ atualizar</span></div>`;
+  card.innerHTML = html;
+  return card;
+}
+
+function usageChart(series) {
+  if (!series) return '';
+  let out = '';
+  const s = series.samples || [];
+  if (s.length > 1) {
+    const t0 = s[0][0], t1 = s[s.length - 1][0] || t0 + 1;
+    const pts = s.map(([t, p]) => `${((t - t0) / (t1 - t0 || 1) * 100).toFixed(1)},${(34 - p / 100 * 32).toFixed(1)}`).join(' ');
+    out += `<div class="chart"><div class="lbl">Últimas 24h</div><svg viewBox="0 0 100 34" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="var(--info)" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg></div>`;
+  }
+  const d = (series.days || []).filter((x) => x.max != null);
+  if (d.length > 1) {
+    const w = 100 / series.days.length;
+    out += `<div class="chart"><div class="lbl">Pico diário — 7 dias</div><svg viewBox="0 0 100 34" preserveAspectRatio="none">${series.days.map((x, i) => x.max == null ? '' : `<rect x="${(i * w + 1).toFixed(1)}" y="${(34 - x.max / 100 * 32).toFixed(1)}" width="${(w - 2).toFixed(1)}" height="${(x.max / 100 * 32).toFixed(1)}" fill="${x.max >= 85 ? 'var(--bad)' : x.max >= 60 ? 'var(--warn)' : 'var(--ok)'}" rx="1"/>`).join('')}</svg></div>`;
+  }
+  return out;
+}
+function costChart(days) {
+  if (!days || days.length < 2) return '';
+  const max = Math.max(...days.map((d) => d.cost), 0.01), w = 100 / days.length;
+  return `<div class="chart"><div class="lbl">Custo — 7 dias (máx $${max.toFixed(2)})</div><svg viewBox="0 0 100 34" preserveAspectRatio="none">${days.map((d, i) => `<rect x="${(i * w + 1).toFixed(1)}" y="${(34 - d.cost / max * 32).toFixed(1)}" width="${(w - 2).toFixed(1)}" height="${(d.cost / max * 32).toFixed(1)}" fill="var(--info)" rx="1"/>`).join('')}</svg></div>`;
+}
+
+function showPop(id) { if (approvals.pending.length) return; hovered = id; setView('pop'); }
+
+// ---------- abrir/fechar ----------
+function setOpen(v) {
+  if (!v && (pinned || approvals.pending.length || document.activeElement && /TEXTAREA|INPUT/.test(document.activeElement.tagName))) return;
+  document.body.classList.toggle('open', v);
+  if (!v) { hovered = null; if (view === 'pop' || view === 'sessions') setView(null); }
+}
+const UI = '#bar, #panel, #hit';
+const root = $('#root');
+root.addEventListener('mousemove', (e) => {
+  const overUi = e.target.closest(UI);
+  api.setIgnoreMouse(!overUi);
+  if (overUi) { clearTimeout(openTimer); setOpen(true); }
+});
+document.addEventListener('mouseleave', () => { api.setIgnoreMouse(true); openTimer = setTimeout(() => setOpen(false), 300); });
+root.addEventListener('mouseover', (e) => { if (!e.target.closest(UI)) openTimer = setTimeout(() => setOpen(false), 300); });
+document.addEventListener('mouseup', () => { if (document.body.classList.contains('dragging')) { document.body.classList.remove('dragging'); api.drag('end'); } });
+
+function applySettings(s) {
+  settings = s;
+  document.body.classList.toggle('left', s.side === 'left');
+  document.body.classList.toggle('right', s.side !== 'left');
+  document.body.classList.toggle('dnd', !!s.dnd);
+  renderBar();
+}
+
+// toasts com auto-dismiss
+function onNotify(n) {
+  if (!view) setView(null);
+  const sec = Number(settings.notifications && settings.notifications.autoDismissSec) || 0;
+  if (sec > 0 && n.type !== 'update') toastTimers[n.id] = setTimeout(() => api.dismiss(n.id), sec * 1000);
+  if (!settings.dnd) setOpen(true);
+}
+
+(async () => {
+  applySettings(await api.getSettings());
+  usage = await api.getUsage();
+  approvals = await api.getApprovals();
+  renderBar(); renderPanel();
+  api.onUsage((d) => { usage = d; renderBar(); if (view === 'pop') renderPanel(); });
+  api.onSettings(applySettings);
+  let deferred = false;
+  const typing = () => document.activeElement && /TEXTAREA|INPUT/.test(document.activeElement.tagName) && $('#panel').contains(document.activeElement);
+  api.onApprovals((a) => { approvals = a; renderBar(); if (typing()) { deferred = true; return; } renderPanel(); });
+  document.addEventListener('focusout', () => setTimeout(() => { if (deferred && !typing()) { deferred = false; renderPanel(); } }, 100));
+  api.onNotify(onNotify);
+  api.onUpdate((st) => { if (st && st.status === 'downloaded' && !approvals.feed.some((n) => n.type === 'update')) approvals.feed.unshift({ id: 'update', type: 'update', title: `Atualização ${st.available} pronta`, text: 'Instale quando quiser; leva alguns segundos.', at: new Date().toISOString() }), renderPanel(); });
+  api.onBar((what) => { if (what === 'toggle') { pinned = !pinned; document.body.classList.toggle('open', pinned); if (!pinned) setView(null); } else if (what === 'open') setOpen(true); else if (what === 'blur') { document.activeElement && document.activeElement.blur(); } });
+  setInterval(() => { if (view) renderPanel(); }, 30000);
+})();
+</script>
+</body>
+</html>

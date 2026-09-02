@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>SideNotch — Configurações</title>
+<style>
+  :root { --bg: #111114; --card: #1a1a1f; --fg: #f3f3f5; --muted: #8a8a93; --acc: #22c55e; --bad: #ef4444; --warn: #f59e0b; --line: #2a2a30; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif; font-size: 13px; }
+  main { padding: 20px 24px 28px; max-width: 560px; }
+  h1 { font-size: 18px; margin: 0 0 4px; } .lead { color: var(--muted); margin: 0 0 18px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+  h2 { font-size: 13px; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  label.row { flex-direction: row; align-items: center; gap: 8px; color: var(--fg); }
+  input, select { background: #0b0b0d; color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font: inherit; }
+  input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--acc); }
+  .prov { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .prov:first-of-type { border-top: 0; }
+  .prov .name { font-weight: 600; } .st { font-size: 11.5px; color: var(--muted); }
+  .st.ok { color: var(--acc); } .st.err { color: var(--bad); } .st.warn { color: var(--warn); }
+  .prov .extra { grid-column: 2 / span 2; } .prov .extra input { width: 100%; }
+  .help { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  button { background: var(--acc); color: #04120a; border: 0; border-radius: 8px; padding: 9px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.secondary { background: #2a2a30; color: var(--fg); }
+  button.danger { background: transparent; color: var(--bad); }
+  #saved { color: var(--acc); font-size: 12px; }
+  kbd { background: #0b0b0d; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; font-size: 11px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SideNotch</h1>
+  <p class="lead">Barra lateral com o uso das suas IAs e as aprovações do Claude Code. Passe o mouse na borda da tela para abrir; arraste pelo <b>⋯</b> no topo da barra para mover.</p>
+
+  <section>
+    <h2>Posição e aparência</h2>
+    <div class="grid">
+      <label>Lado da tela <select id="side"><option value="right">Direita</option><option value="left">Esquerda</option></select></label>
+      <label>Posição vertical <select id="vertical"><option value="center">Centro</option><option value="top">Topo</option><option value="bottom">Base</option><option value="custom">Onde eu arrastei</option></select></label>
+      <label>Deslocamento (px, + desce) <input id="offset" type="number" step="10"></label>
+      <label>Monitor <select id="displayId"></select></label>
+      <label>Notch fechada mostra <select id="compact"><option value="dots">Pontinhos coloridos</option><option value="percent">Maior % usado</option><option value="off">Nada (só a borda)</option></select></label>
+      <label>Largura mínima fechada (px) <input id="collapsedWidth" type="number" min="2" max="24"></label>
+      <label>Atualizar uso a cada (s) <input id="refreshSeconds" type="number" min="30" step="30"></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Provedores</h2>
+    <div id="providers"></div>
+  </section>
+
+  <section>
+    <h2>Claude Code — aprovações, sessões e avisos</h2>
+    <p class="help" style="margin:0 0 10px">Instala hooks HTTP em <code>~/.claude/settings.json</code>. A barra recebe pedidos de permissão (Permitir / Sempre / Negar / Responder), aprovação de plano, perguntas, e mostra quando cada sessão <b>terminou</b>, está <b>esperando você</b> ou teve algo <b>negado no auto mode</b>.</p>
+    <label class="row"><input id="apEnabled" type="checkbox"> Receber eventos do Claude Code</label>
+    <div class="grid" style="margin-top:10px">
+      <label>Porta local <input id="apPort" type="number" min="1024" max="65535"></label>
+      <label>Tempo para decidir (s) <input id="apTimeout" type="number" min="10" max="590"></label>
+    </div>
+    <div class="grid" style="margin-top:10px">
+      <label class="row"><input id="apSound" type="checkbox"> Som ao chegar pedido</label>
+      <label class="row"><input id="nDone" type="checkbox"> Avisar "terminou"</label>
+      <label class="row"><input id="nWaiting" type="checkbox"> Avisar "esperando você"</label>
+      <label class="row"><input id="nDenied" type="checkbox"> Avisar negações do auto mode</label>
+      <label class="row"><input id="nToast" type="checkbox"> Notificação do Windows também</label>
+      <label>Cartão some após (s, 0 = nunca) <input id="nDismiss" type="number" min="0" max="600"></label>
+    </div>
+    <div class="actions" style="margin-top:10px">
+      <button id="hookInstall" class="secondary">Instalar / atualizar hooks</button>
+      <button id="hookRemove" class="secondary">Remover hooks</button>
+      <span id="apStatus" class="help"></span>
+    </div>
+    <div class="help" id="apFile" style="margin-top:6px"></div>
+    <div class="help" id="apHist" style="margin-top:8px"></div>
+  </section>
+
+  <section>
+    <h2>Maestri (Wire)</h2>
+    <p class="help" style="margin:0 0 10px">No Maestri: <b>Configurações → Wire</b> → ligue o servidor → aba <b>Pareamento</b> (código de 6 dígitos) ou <b>Manual</b> (senha). A barra mostra os terminais do Maestri em Sessões, avisa quando um agente precisa de atenção e responde prompts S/n com Aprovar/Rejeitar.</p>
+    <div class="grid">
+      <label>Host <input id="mHost" type="text" placeholder="127.0.0.1"></label>
+      <label>Porta <input id="mPort" type="number" placeholder="7434"></label>
+      <label>Código de pareamento (6 dígitos) <input id="mCode" type="text" maxlength="6" placeholder="483920"></label>
+      <label>ou senha (aba Manual) <input id="mPass" type="password"></label>
+      <label>Consultar a cada (s) <input id="mPoll" type="number" min="2" max="60"></label>
+      <label class="row"><input id="mAttn" type="checkbox"> Avisar "precisa de atenção"</label>
+    </div>
+    <div class="actions" style="margin-top:10px">
+      <button id="mPair">Parear</button>
+      <button id="mUnpair" class="secondary">Desparear</button>
+      <span id="mStatus" class="help"></span>
+    </div>
+    <div class="help" id="mKey" style="margin-top:6px"></div>
+  </section>
+
+  <section>
+    <h2>Alertas de limite</h2>
+    <div class="grid">
+      <label class="row"><input id="alEnabled" type="checkbox"> Avisar ao atingir</label>
+      <label>Percentuais (separados por vírgula) <input id="alTh" type="text" placeholder="80, 95"></label>
+      <label class="row"><input id="alReset" type="checkbox"> Avisar quando a janela reiniciar</label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Atalhos globais</h2>
+    <p class="help" style="margin:0 0 8px">Formato do Electron, ex.: <kbd>CommandOrControl+Shift+Space</kbd>, <kbd>Alt+F9</kbd>. Deixe vazio para desativar.</p>
+    <div class="grid">
+      <label>Abrir/fixar a barra <input id="scToggle" type="text" placeholder="CommandOrControl+Shift+Space"></label>
+      <label>Aprovar pedido mais antigo <input id="scApprove" type="text" placeholder="CommandOrControl+Shift+Y"></label>
+      <label>Negar pedido mais antigo <input id="scDeny" type="text" placeholder="CommandOrControl+Shift+N"></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Sistema</h2>
+    <div class="grid">
+      <label class="row"><input id="autoLaunch" type="checkbox"> Iniciar com o Windows</label>
+      <label class="row"><input id="dnd" type="checkbox"> Não perturbe (sem som/toast, não abre sozinha)</label>
+      <label class="row"><input id="upAuto" type="checkbox"> Baixar atualizações automaticamente</label>
+    </div>
+    <div class="actions" style="margin-top:10px">
+      <button id="upCheck" class="secondary">Verificar atualizações</button>
+      <button id="upInstall" class="secondary" hidden>Instalar e reiniciar</button>
+      <span id="upStatus" class="help"></span>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button id="save">Salvar</button>
+    <button id="refresh" class="secondary">Testar / atualizar agora</button>
+    <span id="saved"></span>
+    <span style="flex:1"></span>
+    <button id="quit" class="danger">Sair do app</button>
+  </div>
+</main>
+
+<script>
+const api = window.sidenotch;
+const $ = (s) => document.querySelector(s);
+const META = {
+  claude: { name: 'Claude', help: 'Lê o login do Claude Code (~/.claude/.credentials.json). Opcional: token OAuth (sk-ant-oat…).', field: 'token', placeholder: 'Token OAuth (opcional)' },
+  codex: { name: 'Codex / ChatGPT', help: 'Lê o login do Codex CLI (~/.codex/auth.json).' },
+  cursor: { name: 'Cursor', help: 'cursor.com → F12 → Application → Cookies → valor de WorkosCursorSessionToken.', field: 'cookie', placeholder: 'WorkosCursorSessionToken' },
+  gemini: { name: 'Gemini CLI', help: 'Lê o login do Gemini CLI (~/.gemini/oauth_creds.json).' },
+  antigravity: { name: 'Antigravity (IDE)', help: 'Lê a cota por modelo do Antigravity aberto (processo local). Precisa do IDE em execução.' },
+  openrouter: { name: 'OpenRouter', help: 'Chave em openrouter.ai/keys. Mostra limite da chave e créditos.', field: 'apiKey', placeholder: 'sk-or-…' },
+  nvidia: { name: 'NVIDIA NIM', help: 'Chave nvapi-… de build.nvidia.com. A NVIDIA não expõe uso por API; validamos a chave e mostramos rate-limit quando informado.', field: 'apiKey', placeholder: 'nvapi-…' },
+  opencode: { name: 'OpenCode (local)', help: 'Custo/tokens de hoje e do mês lidos dos arquivos locais do OpenCode CLI.' }
+};
+let settings, usage = [];
+
+function renderProviders() {
+  const box = $('#providers'); box.innerHTML = '';
+  for (const id of settings.order) {
+    const m = META[id]; if (!m) continue;
+    const s = settings.providers[id] || {};
+    const u = usage.find((x) => x.id === id);
+    const st = !s.enabled ? '<span class="st">desativado</span>'
+      : !u ? '<span class="st">—</span>'
+      : u.ok ? `<span class="st ${u.stale ? 'warn' : 'ok'}">${u.stale ? 'Desatualizado (' + u.staleReason + ')' : 'OK'}${u.primary ? ' · ' + Math.round(u.primary.usedPercent) + '% usado' : u.stats ? ' · ' + u.stats.label + ' hoje' : ''}${u.account ? ' · ' + u.account : ''}</span>`
+      : `<span class="st err" title="${(u.hint || '').replace(/"/g, '&quot;')}">${u.error}</span>`;
+    const row = document.createElement('div'); row.className = 'prov';
+    row.innerHTML = `
+      <input type="checkbox" data-en="${id}" ${s.enabled ? 'checked' : ''}>
+      <div><div class="name">${m.name}</div>${st}</div>
+      <div><button class="secondary" data-up="${id}" title="Mover para cima">↑</button></div>
+      <div class="extra">
+        ${m.field ? `<input type="password" data-field="${id}:${m.field}" placeholder="${m.placeholder}" value="${(s[m.field] || '').replace(/"/g, '&quot;')}">` : ''}
+        <div class="help">${m.help}${u && !u.ok && u.hint ? '<br><b>Dica:</b> ' + u.hint : ''}</div>
+      </div>`;
+    box.appendChild(row);
+  }
+  box.querySelectorAll('[data-up]').forEach((b) => b.addEventListener('click', () => {
+    const i = settings.order.indexOf(b.dataset.up);
+    if (i > 0) { [settings.order[i - 1], settings.order[i]] = [settings.order[i], settings.order[i - 1]]; renderProviders(); }
+  }));
+}
+
+function collect() {
+  const patch = {
+    side: $('#side').value, vertical: $('#vertical').value, offset: Number($('#offset').value) || 0,
+    displayId: $('#displayId').value || null, collapsedWidth: Number($('#collapsedWidth').value) || 6, compact: $('#compact').value,
+    refreshSeconds: Number($('#refreshSeconds').value) || 180, autoLaunch: $('#autoLaunch').checked, dnd: $('#dnd').checked,
+    order: settings.order, providers: {},
+    approvals: { enabled: $('#apEnabled').checked, port: Number($('#apPort').value) || 47321, timeoutSec: Math.min(590, Math.max(10, Number($('#apTimeout').value) || 110)), sound: $('#apSound').checked },
+    notifications: { done: $('#nDone').checked, waiting: $('#nWaiting').checked, denied: $('#nDenied').checked, toast: $('#nToast').checked, autoDismissSec: Math.max(0, Number($('#nDismiss').value) || 0) },
+    alerts: { enabled: $('#alEnabled').checked, thresholds: $('#alTh').value.split(',').map((x) => Number(x.trim())).filter((x) => x > 0 && x <= 100), onReset: $('#alReset').checked },
+    shortcuts: { toggle: $('#scToggle').value.trim(), approve: $('#scApprove').value.trim(), deny: $('#scDeny').value.trim() },
+    update: { auto: $('#upAuto').checked },
+    maestri: { host: $('#mHost').value.trim() || '127.0.0.1', port: Number($('#mPort').value) || 7434, pollSeconds: Number($('#mPoll').value) || 4, notifyAttention: $('#mAttn').checked }
+  };
+  for (const id of Object.keys(META)) {
+    const en = $(`[data-en="${id}"]`); if (!en) continue;
+    patch.providers[id] = { enabled: en.checked };
+    const f = document.querySelector(`[data-field^="${id}:"]`);
+    if (f) patch.providers[id][f.dataset.field.split(':')[1]] = f.value.trim();
+  }
+  return patch;
+}
+
+async function load() {
+  settings = await api.getSettings();
+  usage = await api.getUsage();
+  const displays = await api.getDisplays();
+  $('#displayId').innerHTML = '<option value="">Automático (principal)</option>' + displays.map((d) => `<option value="${d.id}">${d.label}</option>`).join('');
+  $('#side').value = settings.side; $('#vertical').value = settings.vertical; $('#offset').value = settings.offset;
+  $('#displayId').value = settings.displayId || ''; $('#collapsedWidth').value = settings.collapsedWidth; $('#compact').value = settings.compact || 'dots';
+  $('#refreshSeconds').value = settings.refreshSeconds; $('#autoLaunch').checked = !!settings.autoLaunch; $('#dnd').checked = !!settings.dnd;
+  const a = settings.approvals || {}, n = settings.notifications || {}, al = settings.alerts || {}, sc = settings.shortcuts || {};
+  $('#apEnabled').checked = !!a.enabled; $('#apPort').value = a.port || 47321; $('#apTimeout').value = a.timeoutSec || 110; $('#apSound').checked = !!a.sound;
+  $('#nDone').checked = !!n.done; $('#nWaiting').checked = !!n.waiting; $('#nDenied').checked = !!n.denied; $('#nToast').checked = !!n.toast; $('#nDismiss').value = n.autoDismissSec ?? 20;
+  $('#alEnabled').checked = !!al.enabled; $('#alTh').value = (al.thresholds || [80, 95]).join(', '); $('#alReset').checked = !!al.onReset;
+  $('#scToggle').value = sc.toggle || ''; $('#scApprove').value = sc.approve || ''; $('#scDeny').value = sc.deny || '';
+  $('#upAuto').checked = !!(settings.update && settings.update.auto);
+  const m = settings.maestri || {};
+  $('#mHost').value = m.host || '127.0.0.1'; $('#mPort').value = m.port || 7434; $('#mPoll').value = m.pollSeconds || 4; $('#mAttn').checked = m.notifyAttention !== false;
+  renderProviders();
+  renderApprovals(await api.getApprovals());
+  renderUpdate(await api.getUpdate());
+}
+
+function renderApprovals(st) {
+  const s = [];
+  s.push(!st.enabled ? 'desativado' : st.running ? `servidor ativo na porta ${st.port}` : `servidor parado${st.error ? ' — ' + st.error : ''}`);
+  s.push(st.hookInstalled ? 'hooks instalados ✓' : 'hooks não instalados (ou desatualizados)');
+  if (st.pending.length) s.push(`${st.pending.length} pendente(s)`);
+  if (st.sessions && st.sessions.length) s.push(`${st.sessions.filter((x) => x.status !== 'ended').length} sessão(ões) ativa(s)`);
+  $('#apStatus').innerHTML = s.map((x) => `<span class="${/✓|ativo/.test(x) ? 'st ok' : 'st'}">${x}</span>`).join(' · ');
+  $('#apFile').textContent = 'Arquivo: ' + st.settingsFile;
+  renderMaestri(st.maestri);
+  const h = st.history || [];
+  $('#apHist').innerHTML = h.length ? '<b>Últimas decisões:</b><br>' + h.slice(0, 8).map((e) => `${new Date(e.at).toLocaleTimeString('pt-BR')} · ${e.tool} · ${e.decision}${e.delivered ? '' : ' <span class="st err">(não entregue)</span>'} · ${(e.summary || '').slice(0, 60).replace(/</g, '&lt;')}`).join('<br>') : '';
+}
+
+function renderMaestri(m) {
+  if (!m) return;
+  const parts = [];
+  if (!m.paired) parts.push('não pareado');
+  else { parts.push(`pareado como ${m.role || '?'}`); parts.push(m.connected ? `conectado a "${m.name || ''}" · ${m.terminals.length} terminal(is) · ${m.workspaces.length} workspace(s)` : `sem conexão${m.error ? ' — ' + m.error : ''}`); }
+  $('#mStatus').innerHTML = parts.map((x) => `<span class="${/conectado a|pareado como/.test(x) ? 'st ok' : /sem conexão/.test(x) ? 'st err' : 'st'}">${x}</span>`).join(' · ');
+  $('#mKey').textContent = m.keyHash ? `Chave de segurança fixada (SHA-256, base64): ${m.keyHash} — confira com a aba Manual do Maestri.` : '';
+  $('#mUnpair').hidden = !m.paired;
+}
+
+function renderUpdate(st) {
+  if (!st) return;
+  const map = { unsupported: 'Auto-update só no instalador (.exe); no ZIP portátil baixe a nova versão manualmente.', idle: '', checking: 'Verificando…', available: `Versão ${st.available} disponível.`, downloading: `Baixando… ${st.progress || 0}%`, downloaded: `Versão ${st.available} pronta para instalar.`, uptodate: 'Você está na versão mais recente.', error: `Erro: ${st.error}` };
+  $('#upStatus').textContent = map[st.status] || st.status;
+  $('#upInstall').hidden = st.status !== 'downloaded';
+}
+
+$('#save').addEventListener('click', async () => { settings = await api.saveSettings(collect()); $('#saved').textContent = 'Salvo ✓'; setTimeout(() => ($('#saved').textContent = ''), 2000); });
+$('#refresh').addEventListener('click', async () => { await api.saveSettings(collect()); $('#saved').textContent = 'Atualizando…'; usage = await api.refresh(); renderProviders(); $('#saved').textContent = ''; });
+$('#hookInstall').addEventListener('click', async () => { await api.saveSettings(collect()); renderApprovals(await api.installHook()); });
+$('#hookRemove').addEventListener('click', async () => renderApprovals(await api.uninstallHook()));
+$('#upCheck').addEventListener('click', async () => renderUpdate(await api.checkUpdate()));
+$('#upInstall').addEventListener('click', () => api.installUpdate());
+$('#quit').addEventListener('click', () => api.quit());
+$('#mPair').addEventListener('click', async () => {
+  await api.saveSettings(collect());
+  $('#mStatus').textContent = 'Pareando…';
+  const r = await api.maestriPair({ code: $('#mCode').value.trim() || undefined, password: $('#mPass').value || undefined, host: $('#mHost').value.trim() || '127.0.0.1', port: Number($('#mPort').value) || 7434 });
+  if (!r.ok) $('#mStatus').innerHTML = `<span class="st err">Falha: ${r.error}</span>`; else { $('#mCode').value = ''; $('#mPass').value = ''; renderMaestri(r.state); }
+});
+$('#mUnpair').addEventListener('click', async () => renderMaestri(await api.maestriUnpair()));
+api.onApprovals(renderApprovals);
+api.onUpdate(renderUpdate);
+api.onUsage((d) => { usage = d; renderProviders(); });
+api.onSettings((s) => { settings = s; $('#dnd').checked = !!s.dnd; $('#side').value = s.side; $('#vertical').value = s.vertical; });
+load();
+</script>
+</body>
+</html>

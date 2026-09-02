@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>SideNotch</title>
+<style>
+  :root {
+    --bg: #0b0b0d; --bg2: #151518; --fg: #f3f3f5; --muted: #8a8a93;
+    --ok: #22c55e; --warn: #f59e0b; --bad: #ef4444; --track: #2a2a30;
+    --bar-w: 64px; --collapsed-w: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  html, body { width: 100%; height: 100%; background: linear-gradient(135deg,#f6c,#fc6,#6cf); overflow: hidden;
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif; color: var(--fg); }
+  #root { position: relative; width: 100%; height: 100%; }
+
+  /* zona de "gatilho" mais larga que a notch fechada, para o hover ser fácil */
+  #hit { position: absolute; top: 0; bottom: 0; width: 28px; }
+  body.right #hit { right: 0; } body.left #hit { left: 0; }
+
+  #bar { position: absolute; top: 50%; transform: translateY(-50%);
+    width: var(--collapsed-w); background: var(--bg);
+    border-radius: 18px; overflow: hidden; box-shadow: 0 6px 24px rgba(0,0,0,.45);
+    transition: width .22s cubic-bezier(.2,.8,.2,1), border-radius .22s; }
+  body.right #bar { right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  body.left  #bar { left: 0;  border-top-left-radius: 0;  border-bottom-left-radius: 0; }
+  body.open #bar { width: var(--bar-w); }
+  body.right.open #bar { border-radius: 22px 0 0 22px; }
+  body.left.open  #bar { border-radius: 0 22px 22px 0; }
+
+  #list { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 0 10px; width: var(--bar-w);
+    opacity: 0; transition: opacity .18s; }
+  body.open #list { opacity: 1; }
+  .item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 6px; border-radius: 12px; cursor: pointer; }
+  .item:hover { background: var(--bg2); }
+  .ring { width: 40px; height: 40px; position: relative; }
+  .ring svg { width: 40px; height: 40px; transform: rotate(-90deg); }
+  .ring .track { stroke: var(--track); }
+  .ring .arc { transition: stroke-dashoffset .6s ease, stroke .3s; stroke-linecap: round; }
+  .ring .icon { position: absolute; inset: 0; display: grid; place-items: center; }
+  .ring .icon svg { width: 16px; height: 16px; transform: none; fill: var(--fg); }
+  .pct { font-size: 11.5px; font-weight: 600; letter-spacing: .2px; }
+  .item.err .pct { color: var(--bad); }
+  .item.loading .ring svg { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(270deg); } }
+  #gear { margin-top: 4px; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+  #gear:hover { background: var(--bg2); }
+  #gear svg { width: 18px; height: 18px; fill: none; stroke: var(--fg); stroke-width: 1.8; }
+
+  /* popover de detalhes */
+  #pop { position: absolute; top: 0; width: 236px; background: var(--bg); border-radius: 14px;
+    padding: 12px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.5); display: none; }
+  body.right #pop { right: calc(var(--bar-w) + 14px); } body.left #pop { left: calc(var(--bar-w) + 14px); }
+  #pop.show { display: block; animation: fade .15s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateX(var(--dx, 6px)); } }
+  body.left #pop { --dx: -6px; }
+  #pop::after { content: ""; position: absolute; top: 24px; border: 7px solid transparent; }
+  body.right #pop::after { right: -14px; border-left-color: var(--bg); }
+  body.left  #pop::after { left: -14px;  border-right-color: var(--bg); }
+  #pop h3 { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  #pop h3 svg { width: 16px; height: 16px; fill: var(--fg); }
+  #pop .sub { color: var(--muted); font-size: 10.5px; margin: -6px 0 8px; }
+  .row { margin: 8px 0; }
+  .row .hdr { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+  .row .hdr .reset { color: var(--muted); }
+  .row .track { height: 5px; background: var(--track); border-radius: 4px; overflow: hidden; }
+  .row .fill { height: 100%; border-radius: 4px; }
+  .row .used { font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+  .hint { font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .errmsg { font-size: 12px; color: var(--bad); margin-bottom: 4px; }
+  .foot { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 8px; }
+</style>
+</head>
+<body class="right">
+<div id="root">
+  <div id="hit"></div>
+  <div id="bar">
+    <div id="list"></div>
+  </div>
+  <div id="pop"></div>
+</div>
+
+<script>const usage = [
+ {id:'claude',name:'Claude',ok:true,primary:{label:'Sessão atual (5h)',usedPercent:73,resetsAt:new Date(Date.now()+2.4*3.6e6).toISOString()},windows:[{label:'Sessão atual (5h)',usedPercent:73,resetsAt:new Date(Date.now()+2.4*3.6e6).toISOString()},{label:'Limite semanal',usedPercent:21,resetsAt:new Date(Date.now()+3*86400e3).toISOString()},{label:'Opus (semanal)',usedPercent:4,resetsAt:new Date(Date.now()+3*86400e3).toISOString()}],account:'jp@medsystem.com',plan:'Max',updatedAt:new Date().toISOString()},
+ {id:'codex',name:'Codex',ok:true,primary:{usedPercent:34},windows:[{label:'Sessão (5h)',usedPercent:34,resetsAt:new Date(Date.now()+1e6).toISOString()},{label:'Limite semanal',usedPercent:6,resetsAt:new Date(Date.now()+4*86400e3).toISOString()}],plan:'plus',credits:12.5,updatedAt:new Date().toISOString()},
+ {id:'cursor',name:'Cursor',ok:true,primary:{usedPercent:92},windows:[{label:'Plano (ciclo mensal)',usedPercent:92,resetsAt:new Date(Date.now()+9*86400e3).toISOString()}],plan:'pro',updatedAt:new Date().toISOString()},
+ {id:'gemini',name:'Gemini',ok:false,error:'Gemini CLI não está logado',hint:'Rode "gemini" para logar.',updatedAt:new Date().toISOString()}
+];
+window.sidenotch = { getSettings:async()=>({side:'right',collapsedWidth:6}), getUsage:async()=>usage, refresh:async()=>usage, setIgnoreMouse(){}, setBarHeight(){}, openSettings(){}, onUsage(){}, onSettings(){} };
+</script><script>
+const ICONS = {
+  claude: '<svg viewBox="0 0 24 24"><path d="M12 2l1.6 6.2L19 5.5l-3.7 5.1L21 12l-5.7 1.4 3.7 5.1-5.4-2.7L12 22l-1.6-6.2L5 18.5l3.7-5.1L3 12l5.7-1.4L5 5.5l5.4 2.7z"/></svg>',
+  codex:  '<svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 2.2a6.8 6.8 0 1 1 0 13.6 6.8 6.8 0 0 1 0-13.6zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>',
+  cursor: '<svg viewBox="0 0 24 24"><path d="M12 2l9 5v10l-9 5-9-5V7l9-5zm0 2.3L5.4 8 12 11.7 18.6 8 12 4.3zM5 9.7v6.1l6 3.3v-6.1L5 9.7z"/></svg>',
+  gemini: '<svg viewBox="0 0 24 24"><path d="M12 2c.6 5.4 4.6 9.4 10 10-5.4.6-9.4 4.6-10 10-.6-5.4-4.6-9.4-10-10 5.4-.6 9.4-4.6 10-10z"/></svg>'
+};
+const GEAR = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
+const R = 17, C = 2 * Math.PI * R;
+const api = window.sidenotch;
+let settings = null, usage = [], hovered = null, openTimer = null;
+const $ = (s) => document.querySelector(s);
+
+function color(p) { return p >= 85 ? 'var(--bad)' : p >= 60 ? 'var(--warn)' : 'var(--ok)'; }
+
+function fmtReset(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), ms = d - Date.now();
+  if (ms <= 0) return 'Reinicia em breve';
+  const h = Math.floor(ms / 3.6e6), m = Math.floor((ms % 3.6e6) / 6e4);
+  if (h < 24) return `Reinicia em ${h ? h + 'h ' : ''}${m}m`;
+  const day = d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+  return `Reinicia ${day} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function renderBar() {
+  const list = $('#list');
+  list.innerHTML = '';
+  for (const u of usage) {
+    const p = u.ok && u.primary ? u.primary.usedPercent : null;
+    const el = document.createElement('div');
+    el.className = 'item' + (u.ok ? '' : ' err');
+    el.dataset.id = u.id;
+    el.innerHTML = `
+      <div class="ring">
+        <svg viewBox="0 0 40 40">
+          <circle class="track" cx="20" cy="20" r="${R}" fill="none" stroke-width="3"/>
+          <circle class="arc" cx="20" cy="20" r="${R}" fill="none" stroke-width="3"
+            stroke="${p == null ? 'var(--track)' : color(p)}" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - (p == null ? 0 : p / 100))}"/>
+        </svg>
+        <div class="icon">${ICONS[u.id] || ''}</div>
+      </div>
+      <div class="pct">${p == null ? (u.ok ? '—' : '!') : Math.round(p) + '%'}</div>`;
+    el.addEventListener('mouseenter', () => showPop(u.id, el));
+    el.addEventListener('click', async () => { el.classList.add('loading'); await api.refresh(); });
+    list.appendChild(el);
+  }
+  const gear = document.createElement('div');
+  gear.id = 'gear'; gear.innerHTML = GEAR; gear.title = 'Configurações';
+  gear.addEventListener('click', () => api.openSettings());
+  gear.addEventListener('mouseenter', hidePop);
+  list.appendChild(gear);
+  api.setBarHeight(list.scrollHeight + 40);
+  if (hovered) { const el = list.querySelector(`[data-id="${hovered}"]`); if (el) showPop(hovered, el); }
+}
+
+function showPop(id, el) {
+  const u = usage.find((x) => x.id === id); if (!u) return;
+  hovered = id;
+  const pop = $('#pop');
+  let html = `<h3>${ICONS[id] || ''}${u.name} — Uso</h3>`;
+  if (u.account || u.plan) html += `<div class="sub">${[u.account, u.plan].filter(Boolean).join(' · ')}</div>`;
+  if (!u.ok) {
+    html += `<div class="errmsg">${esc(u.error)}</div>${u.hint ? `<div class="hint">${esc(u.hint)}</div>` : ''}`;
+  } else if (!u.windows.length) {
+    html += `<div class="hint">${esc(u.note || 'Nenhuma janela de uso informada.')}</div>`;
+  } else {
+    for (const w of u.windows) html += `
+      <div class="row">
+        <div class="hdr"><span>${esc(w.label)}</span><span class="reset">${fmtReset(w.resetsAt)}</span></div>
+        <div class="track"><div class="fill" style="width:${w.usedPercent}%;background:${color(w.usedPercent)}"></div></div>
+        <div class="used">${Math.round(w.usedPercent)}% usado</div>
+      </div>`;
+    if (u.credits != null) html += `<div class="hint">Créditos: ${u.credits}</div>`;
+  }
+  html += `<div class="foot"><span>Atualizado ${new Date(u.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span><span>clique no anel p/ atualizar</span></div>`;
+  pop.innerHTML = html;
+  pop.classList.add('show');
+  // alinha o popover com o item
+  const top = el.getBoundingClientRect().top - 16;
+  pop.style.top = Math.max(0, Math.min(top, window.innerHeight - pop.offsetHeight - 4)) + 'px';
+}
+function hidePop() { hovered = null; $('#pop').classList.remove('show'); }
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+// abrir/fechar a barra
+function setOpen(v) { document.body.classList.toggle('open', v); if (!v) hidePop(); }
+const root = $('#root');
+root.addEventListener('mousemove', (e) => {
+  const overUi = e.target.closest('#bar, #pop, #hit');
+  api.setIgnoreMouse(!overUi);                   // deixa cliques passarem nas áreas transparentes
+  if (overUi) { clearTimeout(openTimer); setOpen(true); }
+});
+document.addEventListener('mouseleave', () => { api.setIgnoreMouse(true); openTimer = setTimeout(() => setOpen(false), 250); });
+root.addEventListener('mouseover', (e) => { if (!e.target.closest('#bar, #pop, #hit')) openTimer = setTimeout(() => setOpen(false), 250); });
+
+function applySettings(s) {
+  settings = s;
+  document.body.classList.toggle('left', s.side === 'left');
+  document.body.classList.toggle('right', s.side !== 'left');
+  document.documentElement.style.setProperty('--collapsed-w', (s.collapsedWidth || 6) + 'px');
+}
+
+(async () => {
+  applySettings(await api.getSettings());
+  usage = await api.getUsage();
+  renderBar();
+  api.onUsage((d) => { usage = d; renderBar(); });
+  api.onSettings(applySettings);
+  setInterval(() => { if (hovered) { const el = document.querySelector(`[data-id="${hovered}"]`); if (el) showPop(hovered, el); } }, 30000);
+})();
+</script>
+</body>
+</html>

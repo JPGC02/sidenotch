@@ -1,0 +1,62 @@
+{
+  "name": "sidenotch",
+  "productName": "SideNotch",
+  "version": "2.1.0",
+  "description": "Sidebar fixa para Windows que mostra o uso das suas IAs (Claude, Codex, Cursor, Gemini) ao passar o mouse.",
+  "main": "src/main.js",
+  "author": "JP / Medsystem",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/providers.test.js && node test/approvals.test.js && node test/history.test.js && node test/maestri.test.js",
+    "dist": "electron-builder --win nsis --x64",
+    "dist:zip": "electron-builder --win zip --x64"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.medsystem.sidenotch",
+    "productName": "SideNotch",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "JPGC02",
+        "repo": "sidenotch"
+      }
+    ]
+  },
+  "repository": "https://github.com/JPGC02/sidenotch",
+  "dependencies": {
+    "electron-updater": "6.3.9"
+  }
+}
