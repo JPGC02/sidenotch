@@ -51,7 +51,8 @@
       {
         "provider": "github",
         "owner": "JPGC02",
-        "repo": "sidenotch"
+        "repo": "sidenotch",
+        "releaseType": "release"
       }
     ]
   },
