@@ -9,11 +9,12 @@ const { MaestriClient } = require('./maestri');
 const { SystemMonitor } = require('./system');
 const apps = require('./apps');
 const { Calendar } = require('./calendar');
+const { Weather } = require('./weather');
 const { Docs } = require('./docs');
 
 const WIN_W = 340;            // largura da janela transparente (barra + cartões)
 let WIN_H = 420;
-let store, bar, notch, settingsWin, tray, timer, server, history, updater, maestri, sysmon, calendar, docs, calTimer;
+let store, bar, notch, settingsWin, tray, timer, server, history, updater, maestri, sysmon, calendar, docs, calTimer, weather, weatherTimer;
 const webappWins = new Map();
 let lastUsage = [];
 
@@ -29,6 +30,7 @@ app.whenReady().then(() => {
   createTray();
   startSystem();
   startCalendar();
+  startWeather();
   applyAutoLaunch();
   startServer();
   startMaestri();
@@ -96,6 +98,13 @@ function startCalendar() {
   clearInterval(calTimer);
   calTimer = setInterval(run, Math.max(5, Number(store.get().calendar.refreshMinutes) || 15) * 60000);
   run();
+}
+
+// ---------- Clima ----------
+function startWeather() {
+  weather = weather || new Weather();
+  const run = async () => { broadcast('weather', await weather.refresh(store.get().weather || {})); };
+  clearInterval(weatherTimer); weatherTimer = setInterval(run, 15 * 60000); run();
 }
 
 // ---------- Web apps em janela própria (sessão persistente: mantém login) ----------
@@ -349,6 +358,7 @@ ipcMain.handle('settings:save', (_e, patch) => {
   if (JSON.stringify(store.get().approvals) !== before) startServer();
   startMaestri();
   if (patch && patch.calendar) startCalendar();
+  if (patch && patch.weather) { weather.loc = null; startWeather(); }
   broadcast('settings', store.get());
   resetCache();
   refresh();
@@ -398,6 +408,7 @@ ipcMain.handle('webapps:list', () => (store.get().webapps || apps.DEFAULT_WEBAPP
 ipcMain.handle('webapps:open', (_e, id) => { const w = (store.get().webapps || apps.DEFAULT_WEBAPPS).find((x) => x.id === id); if (w) openWebApp(w); return !!w; });
 ipcMain.handle('webapps:set', (_e, list) => { store.set({ webapps: Array.isArray(list) ? list.slice(0, 40) : null }); broadcast('settings', store.get()); return store.get().webapps; });
 ipcMain.handle('calendar:get', () => calendar ? calendar.state() : null);
+ipcMain.handle('weather:get', () => weather ? weather.snapshot() : null);
 ipcMain.handle('calendar:refresh', async () => { await calendar.refresh(store.get().calendar.sources || []); const st = calendar.state(); broadcast('calendar', st); return st; });
 ipcMain.handle('docs:get', () => docs.get());
 ipcMain.handle('docs:set', (_e, patch) => docs.set(patch || {}));

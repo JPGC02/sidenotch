@@ -35,6 +35,8 @@ contextBridge.exposeInMainWorld('sidenotch', {
   openWebApp: (id) => ipcRenderer.invoke('webapps:open', id),
   setWebApps: (list) => ipcRenderer.invoke('webapps:set', list),
   getCalendar: () => ipcRenderer.invoke('calendar:get'),
+  getWeather: () => ipcRenderer.invoke('weather:get'),
+  onWeather: (cb) => ipcRenderer.on('weather', (_e, d) => cb(d)),
   refreshCalendar: () => ipcRenderer.invoke('calendar:refresh'),
   getDocs: () => ipcRenderer.invoke('docs:get'),
   setDocs: (patch) => ipcRenderer.invoke('docs:set', patch),

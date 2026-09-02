@@ -51,13 +51,14 @@ const DEFAULTS = {
   },
   notch: {                    // notch no topo do monitor (convive com a barra lateral)
     enabled: true, displayId: null, offsetX: 0,
-    show: { music: true, system: true, calendar: true },
+    show: { music: true, system: true, calendar: true, clock: true, weather: true },
     tab: 'music'
   },
   sidebar: { enabled: true },
   webapps: null,              // null = lista padrão (apps.DEFAULT_WEBAPPS); [{id,name,url}]
   pinnedApps: [],             // ids de apps do Menu Iniciar fixados
-  calendar: { sources: [], refreshMinutes: 15 }   // [{name, url, color}]
+  calendar: { sources: [], refreshMinutes: 15 },  // [{name, url, color}]
+  weather: { lat: '', lon: '', label: '' }         // vazio = localização automática por IP
 };
 
 class Store {

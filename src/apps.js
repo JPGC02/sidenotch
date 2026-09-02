@@ -30,16 +30,27 @@ function walk(dir, depth, out) {
 let cache = null, cacheAt = 0;
 const iconCache = new Map();
 
+const withTimeout = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(() => r(null), ms))]);
+
 async function iconFor(target, fallback) {
   const key = target || fallback;
   if (iconCache.has(key)) return iconCache.get(key);
   let url = null;
-  for (const f of [target, fallback]) {
+  // alvos em rede (\\servidor\…) podem demorar/travar: usa só o ícone do próprio .lnk, com tempo limite
+  const candidates = target && !/^\\\\/.test(target) ? [target, fallback] : [fallback];
+  for (const f of candidates) {
     if (!f) continue;
-    try { const img = await app.getFileIcon(f, { size: 'large' }); if (img && !img.isEmpty()) { url = img.toDataURL(); break; } } catch { /* tenta o próximo */ }
+    try { const img = await withTimeout(app.getFileIcon(f, { size: 'large' }), 1500); if (img && !img.isEmpty()) { url = img.toDataURL(); break; } } catch { /* tenta o próximo */ }
   }
   iconCache.set(key, url);
   return url;
+}
+
+// roda tarefas com concorrência limitada (evita centenas de extrações de ícone ao mesmo tempo)
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length); let i = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k]); } }));
+  return out;
 }
 
 // Lista apps instalados (cache 10 min). Cada item: { id, name, lnk, target, icon }
@@ -59,7 +70,7 @@ async function listInstalled({ withIcons = true, force = false } = {}) {
     if (!prev || (isExe && prev.kind !== 'app')) seen.set(name.toLowerCase(), entry);
   }
   const list = [...seen.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  if (withIcons) await Promise.all(list.map(async (a) => { a.icon = await iconFor(a.target, a.lnk); }));
+  if (withIcons) await withTimeout(mapLimit(list, 6, async (a) => { a.icon = await iconFor(a.target, a.lnk); }), 20000);
   cache = list; cacheAt = Date.now();
   return list;
 }

@@ -1,7 +1,7 @@
 {
   "name": "sidenotch",
   "productName": "SideNotch",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "Sidebar fixa para Windows que mostra o uso das suas IAs (Claude, Codex, Cursor, Gemini) ao passar o mouse.",
   "main": "src/main.js",
   "author": "JP / Medsystem",

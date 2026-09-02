@@ -72,7 +72,7 @@ class Calendar {
   constructor() { this.sources = []; this.events = []; this.errors = {}; this.updatedAt = null; }
 
   async refresh(urls, { daysAhead = 45 } = {}) {
-    const from = Date.now() - DAY, to = Date.now() + daysAhead * DAY;
+    const from = Date.now() - 14 * DAY, to = Date.now() + daysAhead * DAY;
     const all = []; this.errors = {};
     await Promise.all((urls || []).filter(Boolean).map(async (u, idx) => {
       try {
@@ -102,7 +102,7 @@ class Calendar {
     }
     const todayEv = this.events.filter((e) => e.start < today0.getTime() + DAY && e.end > today0.getTime());
     const next = this.events.find((e) => e.start > now && !e.allDay) || null;
-    return { updatedAt: this.updatedAt, errors: this.errors, days, today: todayEv, next, upcoming: this.events.filter((e) => e.end > now).slice(0, 30) };
+    return { updatedAt: this.updatedAt, errors: this.errors, days, today: todayEv, next, upcoming: this.events.filter((e) => e.end > now).slice(0, 30), events: this.events.slice(0, 600) };
   }
 }
 

@@ -36,6 +36,7 @@
   @keyframes marquee { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(calc(-100% + 130px)); } }
   #mini .bar { width: 26px; height: 4px; border-radius: 2px; background: var(--bg3); overflow: hidden; } #mini .bar i { display: block; height: 100%; }
   #mini .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+  #mini .clock b { font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .3px; } #mini .wi { font-size: 13px; }
   #mini .dot.playing { animation: pulse 1.2s ease-in-out infinite; } @keyframes pulse { 50% { opacity: .35; } }
 
   /* estado aberto */
@@ -105,7 +106,8 @@
   /* calendário */
   .week { display: grid; grid-template-columns: 64px repeat(8, 1fr); align-items: end; gap: 6px; padding: 6px 0 12px; }
   .week .mon { font-size: 26px; font-weight: 800; } .week .d { text-align: center; } .week .d .wd { font-size: 10px; color: var(--muted); font-weight: 700; } .week .d .n { font-size: 20px; font-weight: 700; color: #9a9aa3; }
-  .week .d.today .n { color: var(--info); } .week .d.today .wd { color: var(--fg); } .week .d.we .n { color: #c98e8e; }
+  .week .d { cursor: pointer; border-radius: 10px; padding: 4px 0; } .week .d:hover { background: var(--bg2); }
+  .week .d.today .n { color: var(--info); } .week .d.sel .wd { color: var(--fg); } .week .d.sel { background: var(--bg3); } .week .d.we .n { color: #c98e8e; }
   .week .d .dots { height: 6px; display: flex; justify-content: center; gap: 2px; } .week .d .dots i { width: 4px; height: 4px; border-radius: 50%; background: var(--acc); }
   .ev { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--line); } .ev:first-child { border-top: 0; }
   .ev .c { width: 4px; align-self: stretch; border-radius: 2px; } .ev .t { font-size: 11.5px; color: var(--muted); width: 88px; font-variant-numeric: tabular-nums; } .ev .s { font-size: 13px; font-weight: 600; }
@@ -142,9 +144,9 @@ const I = {
   cpu: '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/><path d="M9 1v5M15 1v5M9 18v5M15 18v5M1 9h5M1 15h5M18 9h5M18 15h5"/></svg>',
   calEmpty: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/></svg>'
 };
-const TABS = [['music', 'Música'], ['sys', 'Sistema'], ['apps', 'Apps'], ['notes', 'Notas'], ['canvas', 'Canvas'], ['cal', 'Calendário']];
-let settings = {}, sys = null, cal = null, docs = { notes: [], boards: [] }, approvals = { pending: [], maestri: null }, tab = 'music', openTimer = null, pinned = false;
-let installed = null, webapps = [], appQuery = '';
+const TABS = [['music', 'Música'], ['sys', 'Sistema'], ['apps', 'Apps'], ['notes', 'Notas'], ['cal', 'Calendário']];   // canvas desativado por enquanto
+let settings = {}, sys = null, cal = null, wx = null, docs = { notes: [], boards: [] }, approvals = { pending: [], maestri: null }, tab = 'music', openTimer = null, pinned = false;
+let installed = null, webapps = [], appQuery = '', loadingApps = false;
 
 const fmtB = (b) => b > 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : b > 1e3 ? Math.round(b / 1e3) + ' KB' : Math.round(b) + ' B';
 const fmtRate = (b) => b > 1e6 ? (b / 1e6).toFixed(1) + ' MB/s' : (b / 1e3).toFixed(0) + ' KB/s';
@@ -165,7 +167,9 @@ function renderMini() {
   if (sh.calendar !== false && cal && cal.next) { const min = Math.round((cal.next.start - Date.now()) / 60000); h += `<div class="seg">${I.cal}<span>${min < 60 ? min + ' min' : hhmm(cal.next.start)} · ${esc(cal.next.title.slice(0, 18))}</span></div>`; }
   const n = (approvals.pending || []).length + ((approvals.maestri && approvals.maestri.prompts) || []).length;
   if (n) h += `<div class="seg" style="color:var(--warn)">⚠ ${n}</div>`;
-  if (!h) h = `<div class="seg muted">${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>`;
+  if (sh.clock !== false) h = `<div class="seg clock"><b>${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b></div>` + h;
+  if (sh.weather !== false && wx && wx.ok) h += `<div class="seg" title="${esc(wx.desc || '')}${wx.label ? ' · ' + esc(wx.label) : ''}"><span class="wi">${wx.icon}</span>${wx.temp}°</div>`;
+  if (!h) h = `<div class="seg muted">SideNotch</div>`;
   box.innerHTML = h;
   const w = Math.min(600, Math.max(220, box.scrollWidth + 20));
   if (!document.body.classList.contains('open')) $('#pill').style.width = w + 'px';
@@ -187,7 +191,7 @@ function renderView() {
   else if (tab === 'apps') { v.innerHTML = viewApps(); bindApps(); }
   else if (tab === 'notes') { v.innerHTML = viewNotes(); bindNotes(); }
   else if (tab === 'canvas') { v.innerHTML = viewCanvas(); bindCanvas(); }
-  else if (tab === 'cal') v.innerHTML = viewCal();
+  else if (tab === 'cal') { v.innerHTML = viewCal(); bindCal(); }
   if (tab === 'music') bindMusic();
   requestAnimationFrame(fitPill);
 }
@@ -218,7 +222,8 @@ function viewSys() {
   if (!sys) return '<div class="empty">Coletando…</div>';
   const h = sys.history || {};
   const up = sys.uptime || 0, upS = `${Math.floor(up / 86400)}d ${Math.floor(up % 86400 / 3600)}h ${Math.floor(up % 3600 / 60)}m`;
-  return `<div class="sys">
+  const w = wx && wx.ok ? `<div class="card" style="grid-column:1/-1;display:flex;align-items:center;gap:14px"><span style="font-size:30px">${wx.icon}</span><div class="grow"><div class="kpi"><span><b style="font-size:20px">${wx.temp}°C</b> <span class="muted">sensação ${wx.feels}°</span></div><span class="muted">${esc(wx.label || '')}</span></div><div class="muted">${esc(wx.desc || '')} · mín ${wx.min}° / máx ${wx.max}° · umidade ${wx.humidity}% · vento ${wx.wind} km/h</div></div>${(wx.days || []).slice(1, 3).map((d) => `<div style="text-align:center"><div class="muted">${new Date(d.date + 'T12:00').toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</div><div>${d.icon}</div><div class="muted">${d.min}°/${d.max}°</div></div>`).join('')}</div>` : (wx && wx.error ? `<div class="muted" style="grid-column:1/-1">Clima indisponível: ${esc(wx.error)}</div>` : '');
+  return `<div class="sys">${w}
     <div class="card"><div class="kpi"><span class="muted">CPU${sys.cores ? ' · ' + sys.cores + ' núcleos' : ''}</span><b style="color:${col(sys.cpu)}">${sys.cpu}%</b></div>${spark(h.cpu, 100, col(sys.cpu))}<div class="muted" style="font-size:10.5px">${esc(sys.cpuModel || '')}</div></div>
     <div class="card"><div class="kpi"><span class="muted">Memória</span><b style="color:${col(sys.mem.percent)}">${sys.mem.percent}%</b></div>${spark(h.mem, 100, col(sys.mem.percent))}<div class="muted" style="font-size:10.5px">${fmtB(sys.mem.used)} de ${fmtB(sys.mem.total)}</div></div>
     <div class="card"><div class="kpi"><span class="muted">Rede ↓</span><b>${fmtRate(sys.net.down)}</b></div>${spark(h.down, null, 'var(--info)')}<div class="kpi" style="margin-top:6px"><span class="muted">↑</span><span>${fmtRate(sys.net.up)}</span></div></div>
@@ -237,7 +242,7 @@ function viewApps() {
     <div class="grid" id="instGrid" style="margin-top:8px">${installedGrid(shown, pins)}</div>`;
 }
 function installedGrid(shown, pins) {
-  if (installed === null) return '<div class="muted">Carregando Menu Iniciar…</div>';
+  if (installed === null) return '<div class="muted" style="grid-column:1/-1">Carregando atalhos…</div>';
   return shown.map((a) => `<div class="app ${pins.has(a.id) ? 'pinned' : ''}" data-a="${esc(a.id)}" title="${esc(a.target || a.lnk)}${a.kind === 'folder' ? ' (pasta)' : ''}"><span class="pin" data-pin="${esc(a.id)}" title="Fixar">★</span>${a.icon ? `<img src="${a.icon}">` : '<div style="width:34px;height:34px;border-radius:9px;background:var(--bg3)"></div>'}<div class="nm">${a.kind === 'folder' ? '📁 ' : ''}${esc(a.name)}</div></div>`).join('') || '<div class="muted" style="grid-column:1/-1">Nada encontrado.</div>';
 }
 function bindInstalled() {
@@ -258,7 +263,11 @@ function bindApps() {
   const q = $('#appQ'); q.oninput = () => { appQuery = q.value; refreshInstalled(); };   // só a grade re-renderiza: o campo mantém foco e cursor
   $('#addWeb').onclick = () => { $('#addForm').hidden = false; api.setFocusable(true); $('#wName').focus(); };
   $('#wOk').onclick = async () => { const name = $('#wName').value.trim(), url = $('#wUrl').value.trim(); if (!name || !/^https?:\/\//.test(url)) return; webapps.push({ id: 'w' + Date.now().toString(36), name, url }); await api.setWebApps(webapps.map(({ id, name, url }) => ({ id, name, url }))); webapps = await api.listWebApps(); api.setFocusable(false); renderView(); };
-  if (installed === null) api.listApps().then((l) => { installed = l; if (tab === 'apps') { const q = $('#appQ'); const keep = q && document.activeElement === q; refreshInstalled(); const h = $('#view h3 .muted'); if (h) h.textContent = `· ${l.length}`; if (keep) q.focus(); } });
+  if (installed === null && !loadingApps) {
+    loadingApps = true;
+    const done = (l) => { installed = Array.isArray(l) ? l : []; loadingApps = false; if (tab === 'apps') { const q = $('#appQ'); const keep = q && document.activeElement === q; refreshInstalled(); const h = $('#view h3 .muted'); if (h) h.textContent = `· ${installed.length}`; if (keep) q.focus(); } };
+    Promise.race([api.listApps(), new Promise((r) => setTimeout(() => r([]), 25000))]).then(done, () => done([]));
+  }
 }
 
 // notas
@@ -381,20 +390,39 @@ async function exportPng(b) {
 }
 
 // calendário
+let calSel = null, calWeek = 0, calShowAll = false;   // dia selecionado (ms à meia-noite), deslocamento de semanas
+const DAYMS = 86400000;
+const day0 = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 function viewCal() {
   if (!cal) return '<div class="empty">Carregando…</div>';
-  const mon = new Date().toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+  const today = day0(Date.now());
+  if (calSel == null) calSel = today;
+  const events = cal.events || [];
+  const onDay = (t) => events.filter((e) => e.start < t + DAYMS && e.end > t);
+  // faixa: 8 dias começando 3 dias antes de hoje, deslocada por semanas
+  const base = today - 3 * DAYMS + calWeek * 7 * DAYMS;
+  const days = Array.from({ length: 8 }, (_, i) => base + i * DAYMS);
+  const mon = new Date(calSel).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
   const WD = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
   const src = (settings.calendar && settings.calendar.sources || []).length;
-  let h = `<div class="week"><div class="mon">${mon.charAt(0).toUpperCase() + mon.slice(1)}</div>${cal.days.map((d) => `<div class="d ${d.isToday ? 'today' : ''} ${d.wd === 0 || d.wd === 6 ? 'we' : ''}"><div class="wd">${d.isToday ? new Date(d.date).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase() : WD[d.wd]}</div><div class="n">${String(d.day).padStart(2, '0')}</div><div class="dots">${'<i></i>'.repeat(Math.min(3, d.count))}</div></div>`).join('')}</div>`;
+  let h = `<div class="row" style="justify-content:space-between;margin-bottom:-4px"><button id="cwPrev" class="icon" style="width:28px;height:28px">‹</button><span class="muted">${calWeek === 0 ? 'esta semana' : (calWeek > 0 ? '+' : '') + calWeek + ' semana(s)'} · <a id="cwToday" style="cursor:pointer;color:var(--info)">hoje</a></span><button id="cwNext" class="icon" style="width:28px;height:28px">›</button></div>`;
+  h += `<div class="week"><div class="mon">${mon.charAt(0).toUpperCase() + mon.slice(1)}</div>${days.map((t) => { const d = new Date(t); const wd = d.getDay(); const cnt = onDay(t).length; return `<div class="d ${t === today ? 'today' : ''} ${t === calSel ? 'sel' : ''} ${wd === 0 || wd === 6 ? 'we' : ''}" data-day="${t}"><div class="wd">${t === calSel ? d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase() : WD[wd]}</div><div class="n">${String(d.getDate()).padStart(2, '0')}</div><div class="dots">${'<i></i>'.repeat(Math.min(3, cnt))}</div></div>`; }).join('')}</div>`;
   if (!src) return h + `<div class="empty">${I.calEmpty}Nenhum calendário configurado.<div class="muted" style="margin-top:4px">Configurações → Calendário → cole o link .ics (Google: "endereço secreto no formato iCal").</div></div>`;
   const errs = Object.entries(cal.errors || {}); if (errs.length) h += `<div class="muted" style="color:var(--bad);margin-bottom:6px">${errs.map(([n, e]) => esc(n) + ': ' + esc(e)).join(' · ')}</div>`;
   const ev = (e) => `<div class="ev"><div class="c" style="background:${e.color}"></div><div class="t">${e.allDay ? 'dia todo' : hhmm(e.start) + '–' + hhmm(e.end)}</div><div class="grow"><div class="s">${esc(e.title)}</div>${e.location ? `<div class="muted">${esc(e.location)}</div>` : ''}</div></div>`;
-  const todayList = cal.today.slice(0, 6), more = cal.today.length - todayList.length;
-  h += `<h3>Hoje${cal.today.length ? ` <span class="muted" style="text-transform:none;letter-spacing:0">· ${cal.today.length}</span>` : ''}</h3><div class="card">${todayList.length ? todayList.map(ev).join('') + (more > 0 ? `<div class="muted" style="padding-top:8px">+ ${more} mais</div>` : '') : `<div class="empty">${I.calEmpty}Nada para hoje</div>`}</div>`;
-  const later = cal.upcoming.filter((e) => !cal.today.includes(e)).slice(0, 4);
+  const list = onDay(calSel); const shown = calShowAll ? list : list.slice(0, 6); const more = list.length - shown.length;
+  const label = calSel === today ? 'Hoje' : calSel === today + DAYMS ? 'Amanhã' : calSel === today - DAYMS ? 'Ontem' : new Date(calSel).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short' }).replace('.', '');
+  h += `<h3>${label}${list.length ? ` <span class="muted" style="text-transform:none;letter-spacing:0">· ${list.length}</span>` : ''}</h3><div class="card">${shown.length ? shown.map(ev).join('') + (more > 0 ? `<div class="muted" id="calMore" style="padding-top:8px;cursor:pointer">+ ${more} mais</div>` : '') : `<div class="empty">${I.calEmpty}Nada neste dia</div>`}</div>`;
+  const later = events.filter((e) => e.start >= calSel + DAYMS).slice(0, 4);
   if (later.length) h += `<h3>Próximos</h3><div class="card">${later.map((e) => `<div class="ev"><div class="c" style="background:${e.color}"></div><div class="t">${new Date(e.start).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' }).replace('.', '')}${e.allDay ? '' : ' ' + hhmm(e.start)}</div><div class="grow"><div class="s">${esc(e.title)}</div></div></div>`).join('')}</div>`;
   return h;
+}
+function bindCal() {
+  document.querySelectorAll('.week .d').forEach((d) => d.onclick = () => { calSel = Number(d.dataset.day); calShowAll = false; renderView(); });
+  const p = $('#cwPrev'), n = $('#cwNext'), t = $('#cwToday'), m = $('#calMore');
+  if (p) p.onclick = () => { calWeek--; renderView(); }; if (n) n.onclick = () => { calWeek++; renderView(); };
+  if (t) t.onclick = () => { calWeek = 0; calSel = day0(Date.now()); calShowAll = false; renderView(); };
+  if (m) m.onclick = () => { calShowAll = true; renderView(); };
 }
 
 // ---------- abrir/fechar + click-through ----------
@@ -421,16 +449,18 @@ document.addEventListener('focusout', () => setTimeout(() => { if (!typing()) ap
 document.addEventListener('mousedown', (e) => { const t = e.target; if (t && (/(INPUT|TEXTAREA)/.test(t.tagName) || t.isContentEditable)) { api.setFocusable(true); setTimeout(() => t.focus(), 30); } }, true);
 
 (async () => {
-  settings = await api.getSettings(); tab = (settings.notch && settings.notch.tab) || 'music';
+  settings = await api.getSettings(); tab = (settings.notch && settings.notch.tab) || 'music'; if (!TABS.some((t) => t[0] === tab)) tab = 'music';
   sys = await api.getSystem(); cal = await api.getCalendar(); docs = await api.getDocs(); approvals = await api.getApprovals(); webapps = await api.listWebApps();
   renderMini();
   let musicKey = '';
   api.onSystem((s) => { sys = s; renderMini(); if (!document.body.classList.contains('open')) return; if (tab === 'sys') renderView(); if (tab === 'music') { const m = s.media; const k = m ? `${m.title}|${m.artist}|${m.playing}|${!!m.art}` : ''; if (k !== musicKey) { musicKey = k; renderView(); } } });
   api.onCalendar((c) => { cal = c; renderMini(); if (tab === 'cal' && document.body.classList.contains('open')) renderView(); });
+  wx = await api.getWeather(); api.onWeather((w) => { wx = w; renderMini(); if (tab === 'sys' && document.body.classList.contains('open')) renderView(); });
   api.onSettings((s) => { settings = s; renderMini(); });
   api.onApprovals((a) => { approvals = a; renderMini(); });
   api.onBar((w) => { if (w === 'blur') { const a = document.activeElement; if (a && a.blur) a.blur(); } });
-  setInterval(() => { if (!document.body.classList.contains('open')) renderMini(); else { const c = document.querySelector('#tabs .clock'); if (c) c.textContent = `${new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })} · ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`; } }, 15000);
+  setInterval(() => { if (!document.body.classList.contains('open')) renderMini(); }, 20000);
+  setInterval(() => { if (document.body.classList.contains('open')) { const c = document.querySelector('#tabs .clock'); if (c) c.textContent = `${new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })} · ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`; } }, 15000);
 })();
 </script>
 </body>
