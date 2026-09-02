@@ -140,6 +140,11 @@ class MaestriClient extends EventEmitter {
   seen(id) { return this.request('POST', `/api/terminals/${id}/seen`, {}); }
   focus(id) { return this.request('POST', `/api/terminals/${id}/focus`, {}); }
   prompt(id, text) { return this.request('POST', `/api/terminals/${id}/prompt`, { text }); }
+  unload(id) { return this.request('POST', `/api/terminals/${id}/unload`, {}); }      // dormir (nodeUnload)
+  restart(id) { return this.request('POST', `/api/terminals/${id}/restart`, {}); }    // acordar / recarregar
+  kill(id) { return this.request('POST', `/api/terminals/${id}/kill`, {}); }
+  unloadWorkspace(ws) { return this.request('POST', `/api/workspaces/${ws}/unload`, {}); }
+  wakeWorkspace(ws) { return this.request('POST', `/api/workspaces/${ws}/wake`, {}); }
   clearAttention(ws) { return this.request('POST', `/api/workspaces/${ws}/attention/clear`, {}); }
 
   // ---------- estado para a UI ----------
@@ -149,6 +154,7 @@ class MaestriClient extends EventEmitter {
       enabled: !!cfg.enabled, paired: !!cfg.token, connected: this.connected, error: this.lastError,
       host: cfg.host, port: cfg.port, keyHash: cfg.keyHash || '', role: cfg.role || null,
       name: this.info && this.info.name || null, capabilities: (this.info && this.info.capabilities) || [],
+      canUnload: this.has('nodeUnload'), canWorkspaceActions: this.has('workspaceActions'),
       workspaces: this.workspaces.map((w) => ({ id: w.id, name: w.name, attentionCount: w.attentionCount, running: w.runningTerminalCount, total: w.terminalCount, isLoaded: w.isLoaded })),
       terminals: [...this.terminals.values()].map((t) => ({
         id: t.id, name: t.name, agentType: t.agentType, icon: t.icon, color: t.color, status: t.status,

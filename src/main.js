@@ -369,6 +369,8 @@ ipcMain.handle('maestri:action', async (_e, id, action, text) => {
     if (action === 'approve') await maestri.approve(id); else if (action === 'reject') await maestri.reject(id);
     else if (action === 'seen') await maestri.seen(id); else if (action === 'focus') await maestri.focus(id);
     else if (action === 'prompt') await maestri.prompt(id, text || '');
+    else if (action === 'unload') await maestri.unload(id); else if (action === 'restart') await maestri.restart(id); else if (action === 'kill') await maestri.kill(id);
+    else if (action === 'ws-unload') await maestri.unloadWorkspace(id); else if (action === 'ws-wake') await maestri.wakeWorkspace(id);
     if (action === 'approve' || action === 'reject') maestri.prompts.delete(id);
     broadcastApprovals(); maestri.poll().catch(() => {});
     return { ok: true };

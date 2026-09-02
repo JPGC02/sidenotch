@@ -13,8 +13,16 @@
 
   #pill { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: var(--bg); color: var(--fg);
     border-radius: 0 0 18px 18px; box-shadow: 0 8px 30px rgba(0,0,0,.55), inset 0 -1px 0 rgba(255,255,255,.06);
-    width: 240px; height: 30px; overflow: hidden; transition: width .25s cubic-bezier(.2,.8,.2,1), height .25s cubic-bezier(.2,.8,.2,1), border-radius .25s; }
+    width: 240px; height: 30px; overflow: visible; transition: width .25s cubic-bezier(.2,.8,.2,1), height .25s cubic-bezier(.2,.8,.2,1), border-radius .25s; }
+  #clip { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; }
   body.open #pill { border-radius: 0 0 28px 28px; }
+  /* mordidas côncavas: fundem a pastilha com a borda superior da tela */
+  #pill::before, #pill::after { content: ""; position: absolute; top: 0; width: 18px; height: 18px; pointer-events: none; transition: width .25s, height .25s; }
+  #pill::before { left: -18px; background: radial-gradient(circle at 0 100%, transparent 17.5px, var(--bg) 18px); }
+  #pill::after  { right: -18px; background: radial-gradient(circle at 100% 100%, transparent 17.5px, var(--bg) 18px); }
+  body.open #pill::before, body.open #pill::after { width: 26px; height: 26px; }
+  body.open #pill::before { left: -26px; background: radial-gradient(circle at 0 100%, transparent 25.5px, var(--bg) 26px); }
+  body.open #pill::after  { right: -26px; background: radial-gradient(circle at 100% 100%, transparent 25.5px, var(--bg) 26px); }
   body.alert #pill { box-shadow: 0 0 0 2px var(--warn), 0 8px 30px rgba(0,0,0,.55); }
 
   /* estado fechado */
@@ -111,10 +119,10 @@
 <body>
 <div id="root">
   <div id="hit"></div>
-  <div id="pill">
+  <div id="pill"><div id="clip">
     <div id="mini"></div>
     <div id="panel"><div id="tabs"></div><div id="view"></div></div>
-  </div>
+  </div></div>
 </div>
 <script>
 const api = window.sidenotch;
@@ -230,7 +238,7 @@ function viewApps() {
 }
 function installedGrid(shown, pins) {
   if (installed === null) return '<div class="muted">Carregando Menu Iniciar…</div>';
-  return shown.map((a) => `<div class="app ${pins.has(a.id) ? 'pinned' : ''}" data-a="${esc(a.id)}" title="${esc(a.target || a.lnk)}"><span class="pin" data-pin="${esc(a.id)}" title="Fixar">★</span>${a.icon ? `<img src="${a.icon}">` : '<div style="width:34px;height:34px;border-radius:9px;background:var(--bg3)"></div>'}<div class="nm">${esc(a.name)}</div></div>`).join('') || '<div class="muted" style="grid-column:1/-1">Nada encontrado.</div>';
+  return shown.map((a) => `<div class="app ${pins.has(a.id) ? 'pinned' : ''}" data-a="${esc(a.id)}" title="${esc(a.target || a.lnk)}${a.kind === 'folder' ? ' (pasta)' : ''}"><span class="pin" data-pin="${esc(a.id)}" title="Fixar">★</span>${a.icon ? `<img src="${a.icon}">` : '<div style="width:34px;height:34px;border-radius:9px;background:var(--bg3)"></div>'}<div class="nm">${a.kind === 'folder' ? '📁 ' : ''}${esc(a.name)}</div></div>`).join('') || '<div class="muted" style="grid-column:1/-1">Nada encontrado.</div>';
 }
 function bindInstalled() {
   document.querySelectorAll('[data-a]').forEach((el) => el.onclick = (e) => { if (e.target.dataset.pin) return; api.launchApp(el.dataset.a); });
