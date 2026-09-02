@@ -1,14 +1,14 @@
 {
   "name": "sidenotch",
   "productName": "SideNotch",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "description": "Sidebar fixa para Windows que mostra o uso das suas IAs (Claude, Codex, Cursor, Gemini) ao passar o mouse.",
   "main": "src/main.js",
   "author": "JP / Medsystem",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "test": "node test/providers.test.js && node test/approvals.test.js && node test/history.test.js && node test/maestri.test.js",
+    "test": "node test/providers.test.js && node test/approvals.test.js && node test/history.test.js && node test/maestri.test.js && node test/calendar.test.js",
     "dist": "electron-builder --win nsis --x64",
     "dist:zip": "electron-builder --win zip --x64"
   },

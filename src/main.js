@@ -6,10 +6,15 @@ const approvals = require('./approvals');
 const { History } = require('./history');
 const { Updater } = require('./updater');
 const { MaestriClient } = require('./maestri');
+const { SystemMonitor } = require('./system');
+const apps = require('./apps');
+const { Calendar } = require('./calendar');
+const { Docs } = require('./docs');
 
 const WIN_W = 340;            // largura da janela transparente (barra + cartões)
 let WIN_H = 420;
-let store, bar, settingsWin, tray, timer, server, history, updater, maestri;
+let store, bar, notch, settingsWin, tray, timer, server, history, updater, maestri, sysmon, calendar, docs, calTimer;
+const webappWins = new Map();
 let lastUsage = [];
 
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -18,8 +23,12 @@ app.whenReady().then(() => {
   store = new Store(app.getPath('userData'));
   history = new History(app.getPath('userData'));
   if (!store.get().approvals.token) store.set({ approvals: { token: approvals.newToken() } });
+  docs = new Docs(app.getPath('userData'));
   createBar();
+  createNotch();
   createTray();
+  startSystem();
+  startCalendar();
   applyAutoLaunch();
   startServer();
   startMaestri();
@@ -32,7 +41,77 @@ app.whenReady().then(() => {
 
 app.on('second-instance', () => openSettings());
 app.on('window-all-closed', (e) => e.preventDefault());
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => { globalShortcut.unregisterAll(); sysmon && sysmon.stop(); docs && docs.flush(); });
+
+// ---------- Notch (topo) ----------
+const NOTCH_W = 960, NOTCH_H = 560;
+function createNotch() {
+  notch = new BrowserWindow({
+    width: NOTCH_W, height: NOTCH_H,
+    frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true,
+    resizable: false, movable: false, minimizable: false, maximizable: false,
+    focusable: false, hasShadow: false, show: false,
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
+  });
+  notch.setAlwaysOnTop(true, 'screen-saver');
+  notch.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  notch.setMenu(null);
+  notch.loadFile(path.join(__dirname, 'renderer', 'notch.html'));
+  notch.setIgnoreMouseEvents(true, { forward: true });
+  notch.once('ready-to-show', () => { positionNotch(); if (store.get().notch.enabled) notch.show(); });
+  notch.on('blur', () => { if (notch && !notch.isDestroyed() && notch.isFocusable()) { notch.setFocusable(false); notch.webContents.send('bar:blur'); } });
+  const keep = () => { if (!notch || notch.isDestroyed() || !notch.isVisible()) return; notch.setAlwaysOnTop(true, 'screen-saver', 1); notch.moveTop(); };
+  setInterval(keep, 1500);
+  app.on('browser-window-blur', keep); app.on('browser-window-focus', keep);
+  screen.on('display-metrics-changed', positionNotch);
+}
+
+function positionNotch() {
+  if (!notch) return;
+  const s = store.get();
+  const all = screen.getAllDisplays();
+  const d = all.find((x) => String(x.id) === String(s.notch.displayId)) || targetDisplay();
+  const wa = d.workArea;
+  const x = wa.x + Math.round((wa.width - NOTCH_W) / 2) + Number(s.notch.offsetX || 0);
+  notch.setBounds({ x, y: wa.y, width: NOTCH_W, height: NOTCH_H });
+}
+
+function applyWindowVisibility() {
+  const s = store.get();
+  if (bar) (s.sidebar.enabled ? bar.show() : bar.hide());
+  if (notch) (s.notch.enabled ? (positionNotch(), notch.show()) : notch.hide());
+}
+
+// ---------- Sistema / mídia ----------
+function startSystem() {
+  sysmon = new SystemMonitor();
+  sysmon.on('stats', () => { if (notch && !notch.isDestroyed()) notch.webContents.send('system', sysmon.snapshot()); });
+  sysmon.start();
+}
+
+// ---------- Calendário ----------
+function startCalendar() {
+  calendar = new Calendar();
+  const run = async () => { try { await calendar.refresh(store.get().calendar.sources || []); } catch { /* ignore */ } broadcast('calendar', calendar.state()); };
+  clearInterval(calTimer);
+  calTimer = setInterval(run, Math.max(5, Number(store.get().calendar.refreshMinutes) || 15) * 60000);
+  run();
+}
+
+// ---------- Web apps em janela própria (sessão persistente: mantém login) ----------
+function openWebApp(w) {
+  const existing = webappWins.get(w.id);
+  if (existing && !existing.isDestroyed()) { existing.show(); existing.focus(); return; }
+  const win = new BrowserWindow({
+    width: 1100, height: 760, title: w.name, autoHideMenuBar: true, backgroundColor: '#111114',
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+    webPreferences: { partition: 'persist:webapps', contextIsolation: true, nodeIntegration: false, sandbox: true }
+  });
+  win.loadURL(w.url);
+  win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) win.loadURL(url); return { action: 'deny' }; });
+  win.on('closed', () => webappWins.delete(w.id));
+  webappWins.set(w.id, win);
+}
 
 // ---------- Servidor de hooks (aprovações + eventos) ----------
 function startServer() {
@@ -188,7 +267,7 @@ function scheduleRefresh() {
 }
 
 function broadcast(ch, payload) {
-  for (const w of [bar, settingsWin]) if (w && !w.isDestroyed()) w.webContents.send(ch, payload);
+  for (const w of [bar, notch, settingsWin]) if (w && !w.isDestroyed()) w.webContents.send(ch, payload);
 }
 
 // ---------- Atalhos globais ----------
@@ -222,7 +301,8 @@ function buildTrayMenu() {
     { label: upLabel, enabled: st.status !== 'unsupported' && st.status !== 'downloading', click: () => { if (st.status === 'downloaded') updater.install(); else if (st.status === 'available') updater.download(); else updater.check(); } },
     { label: `Versão ${app.getVersion()}`, enabled: false },
     { type: 'separator' },
-    { label: 'Mostrar/ocultar barra', click: () => (bar.isVisible() ? bar.hide() : bar.show()) },
+    { label: 'Mostrar/ocultar barra lateral', click: () => { store.set({ sidebar: { enabled: !store.get().sidebar.enabled } }); applyWindowVisibility(); } },
+    { label: 'Mostrar/ocultar notch', click: () => { store.set({ notch: { enabled: !store.get().notch.enabled } }); applyWindowVisibility(); } },
     { label: 'Sair', click: () => { app.exit(0); } }
   ]));
 }
@@ -241,12 +321,16 @@ function updateTrayTooltip() {
 // ---------- Configurações ----------
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.focus(); return; }
+  // Windows 11 (build ≥ 22000) suporta acrílico nativo; no resto usa fundo sólido
+  const win11 = process.platform === 'win32' && Number((require('os').release().split('.')[2]) || 0) >= 22000;
   settingsWin = new BrowserWindow({
-    width: 560, height: 760, title: 'SideNotch — Configurações', autoHideMenuBar: true,
+    width: 860, height: 700, minWidth: 700, minHeight: 520, title: 'SideNotch — Configurações', autoHideMenuBar: true,
     icon: path.join(__dirname, 'assets', 'icon.png'),
+    titleBarStyle: 'hidden', titleBarOverlay: { color: '#00000000', symbolColor: '#f4f4f6', height: 36 },
+    ...(win11 ? { backgroundMaterial: 'acrylic' } : { backgroundColor: '#0f0f13' }),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
   });
-  settingsWin.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
+  settingsWin.loadFile(path.join(__dirname, 'renderer', 'settings.html'), { query: win11 ? {} : { solid: '1' } });
   settingsWin.on('closed', () => { settingsWin = null; });
 }
 
@@ -257,12 +341,14 @@ function applyAutoLaunch() {
 
 // ---------- IPC ----------
 ipcMain.handle('settings:get', () => store.get());
+ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('settings:save', (_e, patch) => {
   const before = JSON.stringify(store.get().approvals);
   store.set(patch);
-  positionBar(); scheduleRefresh(); applyAutoLaunch(); registerShortcuts(); buildTrayMenu();
+  positionBar(); positionNotch(); applyWindowVisibility(); scheduleRefresh(); applyAutoLaunch(); registerShortcuts(); buildTrayMenu();
   if (JSON.stringify(store.get().approvals) !== before) startServer();
   startMaestri();
+  if (patch && patch.calendar) startCalendar();
   broadcast('settings', store.get());
   resetCache();
   refresh();
@@ -297,10 +383,22 @@ ipcMain.handle('update:check', () => { updater && updater.check(); return update
 ipcMain.handle('update:download', () => { updater && updater.download(); return updater && updater.state; });
 ipcMain.handle('update:install', () => { updater && updater.install(); return updater && updater.state; });
 ipcMain.handle('displays:get', () => screen.getAllDisplays().map((d, i) => ({ id: String(d.id), label: `Monitor ${i + 1} (${d.size.width}×${d.size.height})${d.id === screen.getPrimaryDisplay().id ? ' — principal' : ''}` })));
-ipcMain.on('bar:ignore-mouse', (_e, ignore) => { if (bar && !dragging) bar.setIgnoreMouseEvents(!!ignore, { forward: true }); });
+ipcMain.on('bar:ignore-mouse', (e, ignore) => { const w = BrowserWindow.fromWebContents(e.sender); if (w && !(w === bar && dragging)) w.setIgnoreMouseEvents(!!ignore, { forward: true }); });
 ipcMain.on('bar:height', (_e, h) => { const nh = Math.max(160, Math.min(1000, Math.round(h))); if (nh !== WIN_H) { WIN_H = nh; positionBar(); } });
-ipcMain.on('bar:focusable', (_e, v) => { if (!bar) return; bar.setFocusable(!!v); if (v) bar.focus(); });
+ipcMain.on('bar:focusable', (e, v) => { const w = BrowserWindow.fromWebContents(e.sender); if (!w) return; w.setFocusable(!!v); if (v) w.focus(); });
 ipcMain.on('bar:drag', (_e, phase) => { if (phase === 'start') dragStart(); else dragEnd(); });
 ipcMain.on('app:open-settings', openSettings);
+ipcMain.handle('system:get', () => sysmon ? sysmon.snapshot() : null);
+ipcMain.handle('media:cmd', (_e, cmd) => sysmon ? sysmon.media(cmd) : false);
+ipcMain.handle('apps:list', async (_e, opts) => { try { return await apps.listInstalled(opts || {}); } catch (e) { return []; } });
+ipcMain.handle('apps:launch', (_e, id) => apps.launch(id));
+ipcMain.handle('webapps:list', () => (store.get().webapps || apps.DEFAULT_WEBAPPS).map((w) => ({ ...w, icon: w.icon || apps.faviconUrl(w.url) })));
+ipcMain.handle('webapps:open', (_e, id) => { const w = (store.get().webapps || apps.DEFAULT_WEBAPPS).find((x) => x.id === id); if (w) openWebApp(w); return !!w; });
+ipcMain.handle('webapps:set', (_e, list) => { store.set({ webapps: Array.isArray(list) ? list.slice(0, 40) : null }); broadcast('settings', store.get()); return store.get().webapps; });
+ipcMain.handle('calendar:get', () => calendar ? calendar.state() : null);
+ipcMain.handle('calendar:refresh', async () => { await calendar.refresh(store.get().calendar.sources || []); const st = calendar.state(); broadcast('calendar', st); return st; });
+ipcMain.handle('docs:get', () => docs.get());
+ipcMain.handle('docs:set', (_e, patch) => docs.set(patch || {}));
+ipcMain.on('notch:height', (_e, h) => { /* altura fixa; reservado */ });
 ipcMain.on('app:quit', () => app.exit(0));
 ipcMain.on('app:open-url', (_e, url) => { if (/^https:\/\//.test(url)) shell.openExternal(url); });

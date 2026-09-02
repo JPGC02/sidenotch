@@ -48,7 +48,16 @@ const DEFAULTS = {
   maestri: {                  // Maestri Wire (https://www.themaestri.app/pt-br/docs/wire)
     enabled: false, host: '127.0.0.1', port: 7434, token: '', keyHash: '', deviceId: '', deviceIdentifier: '', role: '', alternateHosts: [],
     pollSeconds: 4, notifyAttention: true
-  }
+  },
+  notch: {                    // notch no topo do monitor (convive com a barra lateral)
+    enabled: true, displayId: null, offsetX: 0,
+    show: { music: true, system: true, calendar: true },
+    tab: 'music'
+  },
+  sidebar: { enabled: true },
+  webapps: null,              // null = lista padrão (apps.DEFAULT_WEBAPPS); [{id,name,url}]
+  pinnedApps: [],             // ids de apps do Menu Iniciar fixados
+  calendar: { sources: [], refreshMinutes: 15 }   // [{name, url, color}]
 };
 
 class Store {
