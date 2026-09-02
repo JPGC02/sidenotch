@@ -7,7 +7,7 @@
   :root {
     --bg: #0b0b0d; --bg2: #151518; --bg3: #1f1f24; --fg: #f3f3f5; --muted: #8a8a93;
     --ok: #22c55e; --warn: #f59e0b; --bad: #ef4444; --info: #60a5fa; --track: #2a2a30;
-    --bar-w: 64px; --collapsed-w: 6px;
+    --bar-w: 64px; --collapsed-w: 6px; --bite: 22px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
   html, body { width: 100%; height: 100%; background: transparent; overflow: hidden;
@@ -17,15 +17,28 @@
   #hit { position: absolute; top: 0; bottom: 0; width: 28px; }
   body.right #hit { right: 0; } body.left #hit { left: 0; }
 
+  /* pílula escura ancorada na borda: cantos externos bem redondos + "mordidas" côncavas em cima e embaixo
+     (pseudo-elementos com gradiente radial que fundem a pílula com a borda da tela) */
   #bar { position: absolute; top: 50%; transform: translateY(-50%);
     width: var(--collapsed-w); background: var(--bg);
-    border-radius: 18px; overflow: hidden; box-shadow: 0 6px 24px rgba(0,0,0,.45);
-    transition: width .22s cubic-bezier(.2,.8,.2,1), border-radius .22s, left .22s, right .22s; }
-  body.right #bar { right: 0; border-radius: 12px 0 0 12px; }
-  body.left  #bar { left: 0;  border-radius: 0 12px 12px 0; }
+    box-shadow: 0 6px 24px rgba(0,0,0,.45);
+    transition: width .22s cubic-bezier(.2,.8,.2,1), border-radius .22s; overflow: visible; }
+  #bar > * { position: relative; z-index: 1; }
+  #bar::before, #bar::after { content: ""; position: absolute; width: var(--bite); height: var(--bite); pointer-events: none; }
+  body.right #bar { right: 0; border-radius: 16px 0 0 16px; }
+  body.left  #bar { left: 0;  border-radius: 0 16px 16px 0; }
   body.open #bar { width: var(--bar-w); }
-  body.right.open #bar { right: 8px; border-radius: 22px; }
-  body.left.open  #bar { left: 8px;  border-radius: 22px; }
+  body.right.open #bar { border-radius: 30px 0 0 30px; }
+  body.left.open  #bar { border-radius: 0 30px 30px 0; }
+  body.right #bar::before { right: 0; top: calc(-1 * var(--bite)); background: radial-gradient(circle at 0 0, transparent calc(var(--bite) - .5px), var(--bg) var(--bite)); }
+  body.right #bar::after  { right: 0; bottom: calc(-1 * var(--bite)); background: radial-gradient(circle at 0 100%, transparent calc(var(--bite) - .5px), var(--bg) var(--bite)); }
+  body.left #bar::before  { left: 0; top: calc(-1 * var(--bite)); background: radial-gradient(circle at 100% 0, transparent calc(var(--bite) - .5px), var(--bg) var(--bite)); }
+  body.left #bar::after   { left: 0; bottom: calc(-1 * var(--bite)); background: radial-gradient(circle at 100% 100%, transparent calc(var(--bite) - .5px), var(--bg) var(--bite)); }
+  body:not(.open) #bar::before, body:not(.open) #bar::after { width: 10px; height: 10px; }
+  body.right:not(.open) #bar::before { top: -10px; background: radial-gradient(circle at 0 0, transparent 9.5px, var(--bg) 10px); }
+  body.right:not(.open) #bar::after { bottom: -10px; background: radial-gradient(circle at 0 100%, transparent 9.5px, var(--bg) 10px); }
+  body.left:not(.open) #bar::before { top: -10px; background: radial-gradient(circle at 100% 0, transparent 9.5px, var(--bg) 10px); }
+  body.left:not(.open) #bar::after { bottom: -10px; background: radial-gradient(circle at 100% 100%, transparent 9.5px, var(--bg) 10px); }
   body.dragging #bar { opacity: .85; }
 
   /* notch fechada: pontinhos / percentual */
@@ -34,8 +47,9 @@
   #compact .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--track); }
   #compact .pctv { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 10px; font-weight: 700; letter-spacing: .5px; }
 
-  #list { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0 8px; width: var(--bar-w); opacity: 0; transition: opacity .18s; }
+  #list { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0 12px; width: var(--bar-w); opacity: 0; transition: opacity .18s; }
   body.open #list { opacity: 1; }
+  body:not(.open) #list { visibility: hidden; }   /* sem overflow:hidden (as mordidas ficam fora do #bar), esconde a lista quando fechada */
   #grip { width: 28px; height: 14px; border-radius: 7px; cursor: grab; display: grid; place-items: center; color: var(--muted); font-size: 12px; letter-spacing: 2px; line-height: 1; margin-bottom: 2px; }
   #grip:hover { background: var(--bg2); color: var(--fg); }
   .item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 6px; border-radius: 12px; cursor: pointer; position: relative; }
@@ -61,7 +75,7 @@
 
   /* painel lateral (cartões, toasts, sessões, popover) */
   #panel { position: absolute; top: 50%; transform: translateY(-50%); max-height: 100%; width: 262px; display: none; flex-direction: column; gap: 8px; overflow-y: auto; padding: 2px 0; scrollbar-width: none; }
-  body.right #panel { right: calc(var(--bar-w) + 20px); } body.left #panel { left: calc(var(--bar-w) + 20px); }
+  body.right #panel { right: calc(var(--bar-w) + 14px); } body.left #panel { left: calc(var(--bar-w) + 14px); }
   body.open #panel.has { display: flex; }
   .card { background: var(--bg); border-radius: 18px; padding: 11px 13px; box-shadow: 0 10px 30px rgba(0,0,0,.5); border-left: 3px solid var(--warn); animation: fade .15s ease; }
   @keyframes fade { from { opacity: 0; transform: translateX(var(--dx, 6px)); } }

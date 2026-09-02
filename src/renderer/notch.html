@@ -39,7 +39,7 @@
   .tab:hover { background: var(--bg2); color: var(--fg); } .tab.on { background: var(--bg3); color: var(--fg); }
   .tab .cnt { position: absolute; top: 2px; right: 3px; min-width: 14px; height: 14px; border-radius: 7px; background: var(--warn); color: #1a1200; font-size: 9.5px; font-weight: 700; display: grid; place-items: center; padding: 0 3px; }
   #tabs .sp { flex: 1; } #tabs .clock { font-size: 12px; color: var(--muted); padding: 0 8px; font-variant-numeric: tabular-nums; }
-  #view { flex: 1; overflow: auto; padding: 6px 18px 16px; scrollbar-width: thin; max-height: 560px; }
+  #view { flex: 1; overflow: auto; padding: 6px 18px 16px; scrollbar-width: none; max-height: 500px; } #view::-webkit-scrollbar { display: none; }
   h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 8px 0 8px; }
   .card { background: var(--bg2); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
   .row { display: flex; align-items: center; gap: 10px; }
@@ -53,6 +53,7 @@
   .bar { height: 6px; background: rgba(255,255,255,.08); border-radius: 3px; overflow: hidden; } .bar i { display: block; height: 100%; background: var(--info); border-radius: 3px; transition: width .4s; }
   .spark { width: 100%; height: 34px; display: block; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  #instGrid { max-height: 232px; overflow: auto; scrollbar-width: none; padding-bottom: 2px; } #instGrid::-webkit-scrollbar { display: none; }
   .app { background: var(--bg2); border: 1px solid var(--line); border-radius: 14px; padding: 10px 6px 8px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; position: relative; text-align: center; }
   .app:hover { background: var(--bg3); } .app img { width: 34px; height: 34px; border-radius: 9px; object-fit: contain; } .app .nm { font-size: 11px; line-height: 1.2; max-height: 27px; overflow: hidden; }
   .app .x { position: absolute; top: 4px; right: 7px; color: var(--muted); font-size: 13px; display: none; } .app:hover .x { display: block; } .app .x:hover { color: var(--bad); }
@@ -224,18 +225,32 @@ function viewApps() {
   const shown = appQuery ? list.slice(0, 24) : [...list.filter((a) => pins.has(a.id)), ...list.filter((a) => !pins.has(a.id))].slice(0, 18);
   return `<h3>Web apps</h3><div class="grid" id="webgrid">${webapps.map((w) => `<div class="app" data-w="${esc(w.id)}" title="${esc(w.url)}"><img src="${esc(w.icon || '')}" onerror="this.style.visibility='hidden'"><div class="nm">${esc(w.name)}</div><span class="x" data-x="${esc(w.id)}" title="Remover">×</span></div>`).join('')}<div class="app add" id="addWeb">+ Adicionar</div></div>
     <div id="addForm" class="row" style="margin-top:8px" hidden><input id="wName" placeholder="Nome" style="width:130px"><input id="wUrl" class="grow" placeholder="https://…"><button class="pri" id="wOk">Salvar</button></div>
-    <div class="row" style="margin-top:14px"><h3 class="grow" style="margin:0">Instalados</h3><input id="appQ" placeholder="Buscar app…" value="${esc(appQuery)}" style="width:200px"></div>
-    <div class="grid" style="margin-top:8px">${installed === null ? '<div class="muted">Carregando Menu Iniciar…</div>' : shown.map((a) => `<div class="app ${pins.has(a.id) ? 'pinned' : ''}" data-a="${esc(a.id)}" title="${esc(a.target || a.lnk)}"><span class="pin" data-pin="${esc(a.id)}" title="Fixar">★</span>${a.icon ? `<img src="${a.icon}">` : '<div style="width:34px;height:34px;border-radius:9px;background:var(--bg3)"></div>'}<div class="nm">${esc(a.name)}</div></div>`).join('') || '<div class="muted">Nada encontrado.</div>'}</div>`;
+    <div class="row" style="margin-top:14px"><h3 class="grow" style="margin:0">Instalados${installed ? ` <span class="muted" style="text-transform:none;letter-spacing:0">· ${installed.length}</span>` : ''}</h3><input id="appQ" placeholder="Buscar app…" value="${esc(appQuery)}" style="width:200px"></div>
+    <div class="grid" id="instGrid" style="margin-top:8px">${installedGrid(shown, pins)}</div>`;
+}
+function installedGrid(shown, pins) {
+  if (installed === null) return '<div class="muted">Carregando Menu Iniciar…</div>';
+  return shown.map((a) => `<div class="app ${pins.has(a.id) ? 'pinned' : ''}" data-a="${esc(a.id)}" title="${esc(a.target || a.lnk)}"><span class="pin" data-pin="${esc(a.id)}" title="Fixar">★</span>${a.icon ? `<img src="${a.icon}">` : '<div style="width:34px;height:34px;border-radius:9px;background:var(--bg3)"></div>'}<div class="nm">${esc(a.name)}</div></div>`).join('') || '<div class="muted" style="grid-column:1/-1">Nada encontrado.</div>';
+}
+function bindInstalled() {
+  document.querySelectorAll('[data-a]').forEach((el) => el.onclick = (e) => { if (e.target.dataset.pin) return; api.launchApp(el.dataset.a); });
+  document.querySelectorAll('[data-pin]').forEach((el) => el.onclick = async (e) => { e.stopPropagation(); const p = new Set(settings.pinnedApps || []); p.has(el.dataset.pin) ? p.delete(el.dataset.pin) : p.add(el.dataset.pin); settings = await api.saveSettings({ pinnedApps: [...p] }); refreshInstalled(); });
+}
+function refreshInstalled() {
+  const g = $('#instGrid'); if (!g) return;
+  const pins = new Set(settings.pinnedApps || []);
+  const list = (installed || []).filter((a) => !appQuery || a.name.toLowerCase().includes(appQuery.toLowerCase()));
+  const shown = appQuery ? list.slice(0, 30) : [...list.filter((a) => pins.has(a.id)), ...list.filter((a) => !pins.has(a.id))].slice(0, 24);
+  g.innerHTML = installedGrid(shown, pins); bindInstalled(); fitPill();
 }
 function bindApps() {
   document.querySelectorAll('[data-w]').forEach((el) => el.onclick = (e) => { if (e.target.dataset.x) return; api.openWebApp(el.dataset.w); });
   document.querySelectorAll('[data-x]').forEach((el) => el.onclick = async (e) => { e.stopPropagation(); webapps = webapps.filter((w) => w.id !== el.dataset.x); await api.setWebApps(webapps.map(({ id, name, url }) => ({ id, name, url }))); webapps = await api.listWebApps(); renderView(); });
-  document.querySelectorAll('[data-a]').forEach((el) => el.onclick = (e) => { if (e.target.dataset.pin) return; api.launchApp(el.dataset.a); });
-  document.querySelectorAll('[data-pin]').forEach((el) => el.onclick = async (e) => { e.stopPropagation(); const p = new Set(settings.pinnedApps || []); p.has(el.dataset.pin) ? p.delete(el.dataset.pin) : p.add(el.dataset.pin); settings = await api.saveSettings({ pinnedApps: [...p] }); renderView(); });
-  const q = $('#appQ'); q.onfocus = () => api.setFocusable(true); q.oninput = () => { appQuery = q.value; const pos = q.selectionStart; renderView(); const nq = $('#appQ'); nq.focus(); nq.setSelectionRange(pos, pos); };
+  bindInstalled();
+  const q = $('#appQ'); q.oninput = () => { appQuery = q.value; refreshInstalled(); };   // só a grade re-renderiza: o campo mantém foco e cursor
   $('#addWeb').onclick = () => { $('#addForm').hidden = false; api.setFocusable(true); $('#wName').focus(); };
   $('#wOk').onclick = async () => { const name = $('#wName').value.trim(), url = $('#wUrl').value.trim(); if (!name || !/^https?:\/\//.test(url)) return; webapps.push({ id: 'w' + Date.now().toString(36), name, url }); await api.setWebApps(webapps.map(({ id, name, url }) => ({ id, name, url }))); webapps = await api.listWebApps(); api.setFocusable(false); renderView(); };
-  if (installed === null) api.listApps().then((l) => { installed = l; if (tab === 'apps') renderView(); });
+  if (installed === null) api.listApps().then((l) => { installed = l; if (tab === 'apps') { const q = $('#appQ'); const keep = q && document.activeElement === q; refreshInstalled(); const h = $('#view h3 .muted'); if (h) h.textContent = `· ${l.length}`; if (keep) q.focus(); } });
 }
 
 // notas
@@ -367,8 +382,9 @@ function viewCal() {
   if (!src) return h + `<div class="empty">${I.calEmpty}Nenhum calendário configurado.<div class="muted" style="margin-top:4px">Configurações → Calendário → cole o link .ics (Google: "endereço secreto no formato iCal").</div></div>`;
   const errs = Object.entries(cal.errors || {}); if (errs.length) h += `<div class="muted" style="color:var(--bad);margin-bottom:6px">${errs.map(([n, e]) => esc(n) + ': ' + esc(e)).join(' · ')}</div>`;
   const ev = (e) => `<div class="ev"><div class="c" style="background:${e.color}"></div><div class="t">${e.allDay ? 'dia todo' : hhmm(e.start) + '–' + hhmm(e.end)}</div><div class="grow"><div class="s">${esc(e.title)}</div>${e.location ? `<div class="muted">${esc(e.location)}</div>` : ''}</div></div>`;
-  h += `<h3>Hoje</h3><div class="card">${cal.today.length ? cal.today.map(ev).join('') : `<div class="empty">${I.calEmpty}Nada para hoje</div>`}</div>`;
-  const later = cal.upcoming.filter((e) => !cal.today.includes(e)).slice(0, 8);
+  const todayList = cal.today.slice(0, 6), more = cal.today.length - todayList.length;
+  h += `<h3>Hoje${cal.today.length ? ` <span class="muted" style="text-transform:none;letter-spacing:0">· ${cal.today.length}</span>` : ''}</h3><div class="card">${todayList.length ? todayList.map(ev).join('') + (more > 0 ? `<div class="muted" style="padding-top:8px">+ ${more} mais</div>` : '') : `<div class="empty">${I.calEmpty}Nada para hoje</div>`}</div>`;
+  const later = cal.upcoming.filter((e) => !cal.today.includes(e)).slice(0, 4);
   if (later.length) h += `<h3>Próximos</h3><div class="card">${later.map((e) => `<div class="ev"><div class="c" style="background:${e.color}"></div><div class="t">${new Date(e.start).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' }).replace('.', '')}${e.allDay ? '' : ' ' + hhmm(e.start)}</div><div class="grow"><div class="s">${esc(e.title)}</div></div></div>`).join('')}</div>`;
   return h;
 }
@@ -379,7 +395,7 @@ const SIZES = { music: [520, 0], sys: [640, 0], apps: [720, 0], notes: [640, 0],
 function fitPill() {
   if (!document.body.classList.contains('open')) return;
   const w = (SIZES[tab] || [640])[0];
-  const h = Math.min(540, $('#tabs').offsetHeight + $('#view').scrollHeight + 6);
+  const h = Math.min(548, $('#tabs').offsetHeight + $('#view').scrollHeight + 6);
   const pill = $('#pill'); pill.style.width = w + 'px'; pill.style.height = h + 'px';
 }
 function setOpen(v) {
